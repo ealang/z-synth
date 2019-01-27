@@ -1,4 +1,5 @@
 #include <sys/time.h>
+#include <mutex>
 #include <cstdint> 
 #include <utility>      // std::pair
 #include <stdio.h>
@@ -73,10 +74,6 @@ public:
      releaseSampleSize((releaseTimeMs / 1000) * sampleRateHz)
   { }
 
-  ~NoteSynth() {
-    printf("delete notesynth\n");
-  }
-
   bool isExhausted() {
     return this->off && this->sampleCount >= this->offSample + this->releaseSampleSize;
   }
@@ -124,10 +121,13 @@ class NoteMux {
   unordered_map<unsigned char, int> notesMap;
   unordered_map<int, shared_ptr<NoteSynth>> synths;
   uint64_t nextId = 0;
+  mutex lock;
 
 public:
 
   void noteOnEvent(unsigned char note, unsigned char vel, uint64_t time) {
+    lock_guard<mutex> guard(this->lock);
+
     if (notesMap.count(note) == 0) {
       auto myId = nextId++;
       auto f = midiNoteToFreq(note);
@@ -138,15 +138,17 @@ public:
     }
   }
   void noteOffEvent(unsigned char note, unsigned char vel, uint64_t time) {
+    lock_guard<mutex> guard(this->lock);
+
     if (notesMap.count(note) > 0) {
       synths[notesMap[note]].get()->postOffEvent(time);
-      printf("removing client %d\n", notesMap[note]);
       notesMap.erase(note);
     }
   }
 
   void generate(sample_t* buffer, int count) {
-    // TODO: must delete dead synths
+    lock_guard<mutex> guard(this->lock);
+
     auto dead = unordered_set<int>();
     memset(buffer, 0, count * sizeof(sample_t));
     for (auto& kv: this->synths) {
@@ -158,7 +160,7 @@ public:
       }
     }
     for (auto id: dead) {
-      printf("erasing synth %d\n", id);
+      printf("erasing client %d\n", id);
       this->synths.erase(id);
     }
   }
@@ -223,28 +225,6 @@ void midi_action(snd_seq_t *seq_handle) {
     }
     snd_seq_free_event(ev);
   } while (snd_seq_event_input_pending(seq_handle, 0) > 0);
-}
-
-
-static void generate_sine(sample_t* samples, int count, double *_phase)
-{
-  // TODO: thread safety
-  noteMux.generate(samples, count);
-  /*
-  static double max_phase = 2. * M_PI;
-  double phase = *_phase;
-  double step = max_phase * freq / (double)rate;
-  unsigned int maxval = (1 << 15) - 1;
-  bool big_endian = snd_pcm_format_big_endian(format) == 1;
-  for (int i = 0; i < count; i++) {
-    sample_t sample = static_cast<sample_t>(sin(phase) * maxval);
-    samples[i] = sample;
-    phase += step;
-    if (phase >= max_phase)
-      phase -= max_phase;
-  }
-  *_phase = phase;
-  */
 }
 
 static void help(void)
@@ -408,11 +388,10 @@ static int xrun_recovery(snd_pcm_t *handle, int err)
 static int write_loop(snd_pcm_t *handle,
                       signed short *samples)
 {
-        double phase = 0;
         signed short *ptr;
         int err, cptr;
         while (1) {
-                generate_sine(samples, period_size, &phase);
+                noteMux.generate(samples, period_size);
                 ptr = samples;
                 cptr = period_size;
                 while (cptr > 0) {
