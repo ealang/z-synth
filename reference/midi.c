@@ -1,3 +1,4 @@
+// http://tldp.org/HOWTO/MIDI-HOWTO-9.html
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

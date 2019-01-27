@@ -1,5 +1,6 @@
 /*
- *  This small demo sends a simple sinusoidal wave to your speakers.
+ * https://www.alsa-project.org/alsa-doc/alsa-lib/_2test_2pcm_8c-example.html
+ * This small demo sends a simple sinusoidal wave to your speakers.
  */
 #include <stdio.h>
 #include <stdlib.h>
