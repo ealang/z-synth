@@ -2,10 +2,10 @@
 #define NOTE_SYNTH_H
 
 #include <cstdint> 
-#include "types.h"
+#include "audio_param.h"
 
 class NoteSynth {
-  float sampleRateHz;
+  AudioParam audioParam;
   float freqHz;
   float velocity;
 
@@ -20,7 +20,7 @@ class NoteSynth {
 
 public:
   NoteSynth(
-      float sampleRateHz,
+      AudioParam audioParam,
       float freqHz,
       float velocity
   );

@@ -1,5 +1,8 @@
+#include <alsa/asoundlib.h>
+
 #include "loops.h"
 #include "midi_mux.h"
+#include "audio_param.h"
 
 static int xrunRecovery(snd_pcm_t *const audioDevice, int err) {
   if (err == -EPIPE) {    /* under-run */
@@ -20,14 +23,14 @@ static int xrunRecovery(snd_pcm_t *const audioDevice, int err) {
   return err;
 }
 
-int audioLoop(snd_pcm_t *const audioDevice, MidiMux *const mux, int period_size) {
-  sample_t *samples = new sample_t[period_size];
+int audioLoop(snd_pcm_t *const audioDevice, MidiMux *const mux, AudioParam *const audioParam) {
+  sample_t *samples = new sample_t[audioParam->bufferSampleCount * audioParam->channelCount];
   signed short *ptr;
   int err, cptr;
   while (1) {
-    mux->generate(samples, period_size);
+    mux->generate(samples, audioParam->bufferSampleCount);
     ptr = samples;
-    cptr = period_size;
+    cptr = audioParam->bufferSampleCount;
     while (cptr > 0) {
       err = snd_pcm_writei(audioDevice, ptr, cptr);
       if (err == -EAGAIN)

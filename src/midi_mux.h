@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "types.h"
+#include "audio_param.h"
 #include "note_synth.h"
 
 class MidiMux {
@@ -16,6 +16,7 @@ class MidiMux {
   std::unordered_map<unsigned char, int> noteSynths;
   std::unordered_map<int, std::shared_ptr<NoteSynth>> synths;
 
+  AudioParam audioParam;
   std::mutex lock;
   bool sustained=false;
   uint32_t sampleRateHz;
@@ -23,7 +24,7 @@ class MidiMux {
 
 public:
 
-  MidiMux(uint32_t sampleRateHz);
+  MidiMux(AudioParam audioParam);
 
   void noteOnEvent(unsigned char note, unsigned char vel);
   void noteOffEvent(unsigned char note);

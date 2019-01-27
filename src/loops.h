@@ -4,8 +4,9 @@
 #include <alsa/asoundlib.h>
 
 class MidiMux;
+class AudioParam;
 
-int audioLoop(snd_pcm_t *const audioDevice, MidiMux *const mux, int period_size);
+int audioLoop(snd_pcm_t *const audioDevice, MidiMux *const mux, AudioParam *const audioParam);
 int midiLoop(snd_seq_t *const midiDevice, MidiMux *const mux);
 
 #endif

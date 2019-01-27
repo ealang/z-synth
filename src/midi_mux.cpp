@@ -8,8 +8,8 @@ static float midiNoteToFreq(unsigned char note) {
   return 440 * powf(2, (static_cast<float>(note) - 69) / 12);
 }
 
-MidiMux::MidiMux(uint32_t sampleRateHz):
-  sampleRateHz(sampleRateHz) {
+MidiMux::MidiMux(AudioParam audioParam):
+  audioParam(audioParam) {
 }
 
 void MidiMux::noteOnEvent(unsigned char note, unsigned char vel) {
@@ -18,7 +18,7 @@ void MidiMux::noteOnEvent(unsigned char note, unsigned char vel) {
   if (heldNotes.count(note) == 0) {
     int myId = nextId++;
     auto synth = make_shared<NoteSynth>(
-        sampleRateHz,
+        audioParam,
         midiNoteToFreq(note),
         vel / 127.f
     );
@@ -81,7 +81,7 @@ void MidiMux::generate(sample_t* buffer, int count) {
   lock_guard<mutex> guard(lock);
 
   auto dead = unordered_set<int>();
-  memset(buffer, 0, count * sizeof(sample_t));
+  memset(buffer, 0, audioParam.channelCount * count * sizeof(sample_t));
   for (auto& kv: synths) {
     NoteSynth *synth = kv.second.get();
     if (synth->isExhausted()) {

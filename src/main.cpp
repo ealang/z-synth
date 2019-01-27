@@ -12,10 +12,11 @@
 using namespace std;
 
 const static string midiDeviceName = "z-synth";
-static string device = "hw:0,0";          /* playback device */
-static unsigned int rate = 44100;         /* stream rate */
-static unsigned int bufferTimeMs = 10;  /* ring buffer length in ms */
-static unsigned int periodTimeMs = 5;   /* period time in ms */
+static string device = "hw:0,0";
+static uint32_t rate = 44100;
+static uint32_t bufferTimeMs = 10;
+static uint32_t periodTimeMs = 5;
+static uint32_t channelCount = 2;
 static snd_pcm_sframes_t bufferSize;
 static snd_pcm_sframes_t periodSize;
 
@@ -45,13 +46,17 @@ static void help(void) {
     "-r,--rate      stream rate in Hz (default: %d)\n"
     "-b,--buffer    buffer size in ms (default: %d)\n"
     "-p,--period    period size in ms (default: %d)\n"
+    "-c,--channels  number of channels (default: %d)\n"
     "\n"
-  , device.c_str(), rate, bufferTimeMs, periodTimeMs);
+    , device.c_str(), rate, bufferTimeMs, periodTimeMs, channelCount
+  );
 }
 
-static int setHwParams(snd_pcm_t *audioDevice,
-    snd_pcm_hw_params_t *params,
-    snd_pcm_access_t access) {
+static int setHwParams(
+  snd_pcm_t *audioDevice,
+  snd_pcm_hw_params_t *params,
+  snd_pcm_access_t access
+) {
   unsigned int rrate;
   snd_pcm_uframes_t size;
   int err, dir;
@@ -81,10 +86,9 @@ static int setHwParams(snd_pcm_t *audioDevice,
     return err;
   }
   /* set the count of channels */
-  unsigned int channels = 1;
-  err = snd_pcm_hw_params_set_channels(audioDevice, params, channels);
+  err = snd_pcm_hw_params_set_channels(audioDevice, params, channelCount);
   if (err < 0) {
-    printf("Channels count (%i) not available for playbacks: %s\n", channels, snd_strerror(err));
+    printf("Channels count (%i) not available for playbacks: %s\n", channelCount, snd_strerror(err));
     return err;
   }
   /* set the stream rate */
@@ -174,6 +178,7 @@ int main(int argc, char *argv[]) {
     {"rate", 1, NULL, 'r'},
     {"buffer", 1, NULL, 'b'},
     {"period", 1, NULL, 'p'},
+    {"channels", 1, NULL, 'c'},
     {NULL, 0, NULL, 0},
   };
   snd_pcm_t *audioDevice;
@@ -205,6 +210,8 @@ int main(int argc, char *argv[]) {
       case 'p':
         periodTimeMs = atoi(optarg);
         break;
+      case 'c':
+        channelCount = atoi(optarg);
     }
   }
   if (morehelp) {
@@ -226,11 +233,12 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  MidiMux midiMux(rate);
+  AudioParam audioParam { rate, (uint32_t)bufferSize, channelCount };
+  MidiMux midiMux(audioParam);
 
   snd_seq_t *midiDevice = openMidiDevice();
 
-  thread audioThread(audioLoop, audioDevice, &midiMux, (int)periodSize);
+  thread audioThread(audioLoop, audioDevice, &midiMux, &audioParam);
   thread midiThread(midiLoop, midiDevice, &midiMux);
 
   audioThread.join();

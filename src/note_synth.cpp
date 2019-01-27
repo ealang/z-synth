@@ -13,15 +13,15 @@ static const float decayTimeMs = 30;
 static const float sustainAmp = 0.8f;
 
 NoteSynth::NoteSynth(
-    float sampleRateHz,
+    AudioParam audioParam,
     float freqHz,
     float velocity
-): sampleRateHz(sampleRateHz),
+): audioParam(audioParam),
    freqHz(freqHz),
    velocity(velocity),
-   attackSampleSize((attackTimeMs / 1000) * sampleRateHz),
-   releaseSampleSize((releaseTimeMs / 1000) * sampleRateHz),
-   decaySampleSize((decayTimeMs / 1000) * sampleRateHz)
+   attackSampleSize((attackTimeMs / 1000) * audioParam.sampleRateHz),
+   releaseSampleSize((releaseTimeMs / 1000) * audioParam.sampleRateHz),
+   decaySampleSize((decayTimeMs / 1000) * audioParam.sampleRateHz)
 { }
 
 bool NoteSynth::isExhausted() {
@@ -29,8 +29,8 @@ bool NoteSynth::isExhausted() {
 }
 
 void NoteSynth::generate(uint64_t nSamples, sample_t* buffer) {
-  static double max_phase = 2. * M_PI;
-  double step = max_phase * freqHz / (double)sampleRateHz;
+  static float max_phase = 2. * M_PI;
+  float step = max_phase * freqHz / (float)audioParam.sampleRateHz;
   unsigned int maxval = (1 << 15) - 1;
   for (uint64_t i = 0; i < nSamples; i++) {
     float amp;
@@ -50,7 +50,9 @@ void NoteSynth::generate(uint64_t nSamples, sample_t* buffer) {
 
     float val = (phase > M_PI ? 1 : -1) * amp * masterAmp;
     sample_t sample = static_cast<sample_t>(val * maxval);
-    buffer[i] += sample;
+    for (uint32_t c = 0; c < audioParam.channelCount; c++) {
+      buffer[i * audioParam.channelCount + c] += sample;
+    }
     phase += step;
     sampleCount++;
     if (phase >= max_phase)
