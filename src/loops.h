@@ -5,7 +5,7 @@
 
 class MidiMux;
 
-int audio_loop(MidiMux *mux, snd_pcm_t *handle, int period_size);
-int midi_loop(snd_seq_t *seq_handle, MidiMux *mux);
+int audioLoop(snd_pcm_t *const audioDevice, MidiMux *const mux, int period_size);
+int midiLoop(snd_seq_t *const midiDevice, MidiMux *const mux);
 
 #endif
