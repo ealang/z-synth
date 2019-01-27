@@ -8,7 +8,7 @@ obj/%.o: %.cpp
 	g++ -g -Wall -Wextra -Werror -Wfatal-errors -c -std=c++11 -I src -o $@ $^
 
 z-synth: $(OBJS)
-	g++ -std=c++11 -lasound -lm -pthread -o $@ $^
+	g++ -std=c++11 $^ -lasound -lm -pthread -o $@
 
 .PHONY: clean
 clean:
