@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <algorithm>
 #include <math.h>
 
@@ -5,34 +6,33 @@
 
 using namespace std;
 
-static const float masterAmp = 0.04f;
-
 static const float attackTimeMs = 10;
 static const float releaseTimeMs = 50;
 static const float decayTimeMs = 30;
 static const float sustainAmp = 0.8f;
 
 NoteSynth::NoteSynth(
-    AudioParam audioParam,
+    uint32_t sampleRateHz,
+    uint32_t channelCount,
     float freqHz,
     float velocity
-): audioParam(audioParam),
+): sampleRateHz(sampleRateHz),
+   channelCount(channelCount),
    freqHz(freqHz),
    velocity(velocity),
-   attackSampleSize((attackTimeMs / 1000) * audioParam.sampleRateHz),
-   releaseSampleSize((releaseTimeMs / 1000) * audioParam.sampleRateHz),
-   decaySampleSize((decayTimeMs / 1000) * audioParam.sampleRateHz)
-{ }
+   periodSize(sampleRateHz / freqHz),
+   attackSampleSize((attackTimeMs / 1000) * sampleRateHz),
+   releaseSampleSize((releaseTimeMs / 1000) * sampleRateHz),
+   decaySampleSize((decayTimeMs / 1000) * sampleRateHz) {
+}
 
 bool NoteSynth::isExhausted() {
   return off && sampleCount >= offSample + releaseSampleSize;
 }
 
-void NoteSynth::generate(uint64_t nSamples, sample_t* buffer) {
-  static float max_phase = 2. * M_PI;
-  float step = max_phase * freqHz / (float)audioParam.sampleRateHz;
-  unsigned int maxval = (1 << 15) - 1;
-  for (uint64_t i = 0; i < nSamples; i++) {
+void NoteSynth::generate(uint32_t nSamples, float* buffer) {
+  uint32_t halfPeriodSize = periodSize / 2;
+  for (uint32_t i = 0; i < nSamples; i++) {
     float amp;
     if (sampleCount < attackSampleSize) {
       amp = (float)sampleCount / attackSampleSize;
@@ -48,15 +48,16 @@ void NoteSynth::generate(uint64_t nSamples, sample_t* buffer) {
       amp = sustainAmp;
     }
 
-    float val = (phase > M_PI ? 1 : -1) * amp * masterAmp;
-    sample_t sample = static_cast<sample_t>(val * maxval);
-    for (uint32_t c = 0; c < audioParam.channelCount; c++) {
-      buffer[i * audioParam.channelCount + c] += sample;
+    float val = (phase > halfPeriodSize ? 1 : -1) * amp * velocity;
+    for (uint32_t c = 0; c < channelCount; c++) {
+      buffer[i * channelCount + c] += val;
     }
-    phase += step;
+
+    phase++;
     sampleCount++;
-    if (phase >= max_phase)
-      phase -= max_phase;
+    if (phase >= periodSize) {
+      phase -= periodSize;
+    }
   }
 }
 

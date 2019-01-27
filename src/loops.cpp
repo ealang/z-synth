@@ -2,7 +2,9 @@
 
 #include "loops.h"
 #include "midi_mux.h"
-#include "audio_param.h"
+
+typedef int16_t sample_t;
+unsigned int maxval = (1 << 15) - 1;
 
 static int xrunRecovery(snd_pcm_t *const audioDevice, int err) {
   if (err == -EPIPE) {    /* under-run */
@@ -23,13 +25,25 @@ static int xrunRecovery(snd_pcm_t *const audioDevice, int err) {
   return err;
 }
 
+void encodeToBufferFmt(uint32_t count, float* from, sample_t* to) {
+  for (uint32_t i = 0; i < count; i++) {
+    to[i] = static_cast<sample_t>(from[i] * maxval);
+  }
+}
+
 int audioLoop(snd_pcm_t *const audioDevice, MidiMux *const mux, AudioParam *const audioParam) {
-  sample_t *samples = new sample_t[audioParam->bufferSampleCount * audioParam->channelCount];
-  signed short *ptr;
+  uint32_t samplesPerGen = audioParam->bufferSampleCount * audioParam->channelCount;
+  auto samplesU = new sample_t[samplesPerGen];
+  auto samplesF = new float[samplesPerGen];
+
+  sample_t* ptr;
   int err, cptr;
   while (1) {
-    mux->generate(samples, audioParam->bufferSampleCount);
-    ptr = samples;
+    memset(samplesF, 0, sizeof(float) * samplesPerGen);
+    mux->generate(audioParam->bufferSampleCount, samplesF);
+    encodeToBufferFmt(samplesPerGen, samplesF, samplesU);
+
+    ptr = samplesU;
     cptr = audioParam->bufferSampleCount;
     while (cptr > 0) {
       err = snd_pcm_writei(audioDevice, ptr, cptr);
@@ -47,7 +61,8 @@ int audioLoop(snd_pcm_t *const audioDevice, MidiMux *const mux, AudioParam *cons
     }
   }
 
-  delete[] samples;
+  delete[] samplesU;
+  delete[] samplesF;
 }
 
 static void handleMidiEvent(MidiMux *const mux, snd_seq_t *const midiDevice) {

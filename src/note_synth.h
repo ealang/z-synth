@@ -2,31 +2,33 @@
 #define NOTE_SYNTH_H
 
 #include <cstdint> 
-#include "audio_param.h"
 
 class NoteSynth {
-  AudioParam audioParam;
+  uint32_t sampleRateHz;
+  uint32_t channelCount;
   float freqHz;
   float velocity;
 
-  double phase = 0;
   bool off = false;
-  uint64_t sampleCount = 0;
-  uint64_t offSample = 0;
+  uint32_t sampleCount = 0;
+  uint32_t offSample = 0;
+  uint32_t phase = 0;
 
-  uint64_t attackSampleSize;
-  uint64_t releaseSampleSize;
-  uint64_t decaySampleSize;
+  uint32_t periodSize;
+  uint32_t attackSampleSize;
+  uint32_t releaseSampleSize;
+  uint32_t decaySampleSize;
 
 public:
   NoteSynth(
-      AudioParam audioParam,
-      float freqHz,
-      float velocity
+    uint32_t sampleRateHz,
+    uint32_t channelCount,
+    float freqHz,
+    float velocity
   );
 
   bool isExhausted();
-  void generate(uint64_t nSamples, sample_t* buffer);
+  void generate(uint32_t nSamples, float* buffer);
   void postOffEvent();
   void postPressureEvent(float pressure);
 };

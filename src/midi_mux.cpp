@@ -1,15 +1,23 @@
-#include <math.h>
 #include <cstring>
+#include <math.h>
+#include <vector>
+
 #include "midi_mux.h"
 
 using namespace std;
+
+static const float masterAmp = 0.005f;
 
 static float midiNoteToFreq(unsigned char note) {
   return 440 * powf(2, (static_cast<float>(note) - 69) / 12);
 }
 
-MidiMux::MidiMux(AudioParam audioParam):
-  audioParam(audioParam) {
+MidiMux::MidiMux(
+  uint32_t sampleRateHz,
+  uint32_t channelCount
+):
+  sampleRateHz(sampleRateHz),
+  channelCount(channelCount) {
 }
 
 void MidiMux::noteOnEvent(unsigned char note, unsigned char vel) {
@@ -18,7 +26,8 @@ void MidiMux::noteOnEvent(unsigned char note, unsigned char vel) {
   if (heldNotes.count(note) == 0) {
     int myId = nextId++;
     auto synth = make_shared<NoteSynth>(
-        audioParam,
+        sampleRateHz,
+        channelCount,
         midiNoteToFreq(note),
         vel / 127.f
     );
@@ -77,19 +86,24 @@ void MidiMux::channelPressureEvent(unsigned char pressure) {
   }
 }
 
-void MidiMux::generate(sample_t* buffer, int count) {
+void MidiMux::generate(uint32_t nSamples, float* buffer) {
   lock_guard<mutex> guard(lock);
 
   auto dead = unordered_set<int>();
-  memset(buffer, 0, audioParam.channelCount * count * sizeof(sample_t));
+
   for (auto& kv: synths) {
     NoteSynth *synth = kv.second.get();
     if (synth->isExhausted()) {
       dead.insert(kv.first);
     } else {
-      synth->generate(count, buffer);
+      synth->generate(nSamples, buffer);
     }
   }
+
+  for (uint32_t i = 0; i < nSamples * channelCount; i++) {
+    buffer[i] *= masterAmp;
+  }
+
   for (auto id: dead) {
     synths.erase(id);
   }

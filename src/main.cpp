@@ -234,7 +234,7 @@ int main(int argc, char *argv[]) {
   }
 
   AudioParam audioParam { rate, (uint32_t)bufferSize, channelCount };
-  MidiMux midiMux(audioParam);
+  MidiMux midiMux(rate, channelCount);
 
   snd_seq_t *midiDevice = openMidiDevice();
 

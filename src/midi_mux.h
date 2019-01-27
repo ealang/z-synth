@@ -1,37 +1,37 @@
 #ifndef NOTE_MUX_H
 #define NOTE_MUX_H
 
+#include <cstdint> 
 #include <memory>
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 
-#include "audio_param.h"
 #include "note_synth.h"
 
 class MidiMux {
+  uint32_t sampleRateHz;
+  uint32_t channelCount;
+
   std::unordered_set<unsigned char> sustainedNotes;
   std::unordered_set<unsigned char> heldNotes;
 
   std::unordered_map<unsigned char, int> noteSynths;
-  std::unordered_map<int, std::shared_ptr<NoteSynth>> synths;
+  std::unordered_map<uint32_t, std::shared_ptr<NoteSynth>> synths;
 
-  AudioParam audioParam;
   std::mutex lock;
   bool sustained=false;
-  uint32_t sampleRateHz;
-  uint64_t nextId = 0;
+  uint32_t nextId = 0;
 
 public:
-
-  MidiMux(AudioParam audioParam);
+  MidiMux(uint32_t sampleRateHz, uint32_t channelCount);
 
   void noteOnEvent(unsigned char note, unsigned char vel);
   void noteOffEvent(unsigned char note);
   void sustainOnEvent();
   void sustainOffEvent();
   void channelPressureEvent(unsigned char pressure);
-  void generate(sample_t* buffer, int count);
+  void generate(uint32_t nSamples, float* buffer);
 };
 
 #endif
