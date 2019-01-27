@@ -18,7 +18,6 @@
 #include <errno.h>
 #include <getopt.h>
 #include <alsa/asoundlib.h>
-#include <sys/time.h>
 #include <string>
 #include <math.h>
 
@@ -39,12 +38,6 @@ static snd_pcm_sframes_t period_size;
 static snd_output_t *output = NULL;
 
 typedef int16_t sample_t;
-
-uint64_t getTime() {
-  struct timeval tv;
-  gettimeofday(&tv, nullptr);
-  return ((uint64_t)tv.tv_sec * 1000000) + tv.tv_usec;
-}
 
 class NoteSynth {
   float sampleRateHz;
@@ -78,12 +71,11 @@ public:
     return this->off && this->sampleCount >= this->offSample + this->releaseSampleSize;
   }
 
-  int generate(uint64_t nSamples, sample_t* buffer) {
+  void generate(uint64_t nSamples, sample_t* buffer) {
     static double max_phase = 2. * M_PI;
     double step = max_phase * this->freqHz / (double)this->sampleRateHz;
     unsigned int maxval = (1 << 15) - 1;
-    bool big_endian = snd_pcm_format_big_endian(format) == 1;
-    for (int i = 0; i < nSamples; i++) {
+    for (uint64_t i = 0; i < nSamples; i++) {
 
       float amp;
       if (this->sampleCount < this->attackSampleSize) {
@@ -107,7 +99,7 @@ public:
     }
   }
 
-  void postOffEvent(uint64_t time) {
+  void postOffEvent() {
     this->offSample = this->sampleCount;
     this->off = true;
   }
@@ -125,23 +117,23 @@ class NoteMux {
 
 public:
 
-  void noteOnEvent(unsigned char note, unsigned char vel, uint64_t time) {
+  void noteOnEvent(unsigned char note, unsigned char vel) {
     lock_guard<mutex> guard(this->lock);
 
     if (notesMap.count(note) == 0) {
       auto myId = nextId++;
       auto f = midiNoteToFreq(note);
-      auto s = make_shared<NoteSynth>(rate, f, 1);
+      auto s = make_shared<NoteSynth>(rate, f, vel / 127.f);
       printf("adding client %d with freq %f\n", (int)myId, f);
       synths.emplace(make_pair(myId, s));
       notesMap[note] = myId;
     }
   }
-  void noteOffEvent(unsigned char note, unsigned char vel, uint64_t time) {
+  void noteOffEvent(unsigned char note) {
     lock_guard<mutex> guard(this->lock);
 
     if (notesMap.count(note) > 0) {
-      synths[notesMap[note]].get()->postOffEvent(time);
+      synths[notesMap[note]].get()->postOffEvent();
       notesMap.erase(note);
     }
   }
@@ -208,15 +200,15 @@ void midi_action(snd_seq_t *seq_handle) {
         fprintf(stderr, "Note On event on Channel %d: %d (vel %d)\n",
                 ev->data.control.channel, ev->data.note.note, ev->data.note.velocity);
         if (ev->data.note.velocity == 0) {
-          noteMux.noteOffEvent(ev->data.note.note, ev->data.note.velocity, getTime());
+          noteMux.noteOffEvent(ev->data.note.note);
         } else {
-          noteMux.noteOnEvent(ev->data.note.note, ev->data.note.velocity, getTime());
+          noteMux.noteOnEvent(ev->data.note.note, ev->data.note.velocity);
         }
         break;        
       case SND_SEQ_EVENT_NOTEOFF: 
-        fprintf(stderr, "Note Off event on Channel %2: %d\n",         
+        fprintf(stderr, "Note Off event on Channel %d: %d\n",         
                 ev->data.control.channel, ev->data.note.note);           
-        noteMux.noteOffEvent(ev->data.note.note, ev->data.note.velocity, getTime());
+        noteMux.noteOffEvent(ev->data.note.note);
         break;        
       case SND_SEQ_EVENT_CHANPRESS:
         fprintf(stderr, "Aftertouch event on Channel %d: %d\n",         
@@ -313,7 +305,7 @@ static int set_hwparams(snd_pcm_t *handle,
         }
         period_size = size;
 
-        printf("buffer size %d period size %d\n", buffer_size, period_size);
+        printf("buffer size %d period size %d\n", (int)buffer_size, (int)period_size);
         /* write the parameters to device */
         err = snd_pcm_hw_params(handle, params);
         if (err < 0) {
@@ -443,9 +435,7 @@ int main(int argc, char *argv[])
   int err, morehelp;
   snd_pcm_hw_params_t *hwparams;
   snd_pcm_sw_params_t *swparams;
-  int method = 0;
   sample_t *samples;
-  unsigned int chn;
   snd_pcm_hw_params_alloca(&hwparams);
   snd_pcm_sw_params_alloca(&swparams);
   morehelp = 0;
@@ -507,7 +497,6 @@ int main(int argc, char *argv[])
   }
   if (verbose > 0)
     snd_pcm_dump(handle, output);
-  printf("allocated %d\n", period_size);
   samples = new sample_t[period_size];
 
   thread audioThread(write_loop, handle, samples);
