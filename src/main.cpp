@@ -14,8 +14,8 @@ using namespace std;
 const static string midiDeviceName = "z-synth";
 static string device = "hw:0,0";          /* playback device */
 static unsigned int rate = 44100;         /* stream rate */
-static unsigned int bufferTimeMs = 20;  /* ring buffer length in ms */
-static unsigned int periodTimeMs = 10;   /* period time in ms */
+static unsigned int bufferTimeMs = 10;  /* ring buffer length in ms */
+static unsigned int periodTimeMs = 5;   /* period time in ms */
 static snd_pcm_sframes_t bufferSize;
 static snd_pcm_sframes_t periodSize;
 
