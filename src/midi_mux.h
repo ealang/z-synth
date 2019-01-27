@@ -10,11 +10,16 @@
 #include "note_synth.h"
 
 class MidiMux {
-  std::unordered_map<unsigned char, int> notesMap;
+  std::unordered_set<unsigned char> sustainedNotes;
+  std::unordered_set<unsigned char> heldNotes;
+
+  std::unordered_map<unsigned char, int> noteSynths;
   std::unordered_map<int, std::shared_ptr<NoteSynth>> synths;
+
   std::mutex lock;
-  uint64_t nextId = 0;
+  bool sustained=false;
   uint32_t sampleRateHz;
+  uint64_t nextId = 0;
 
 public:
 
@@ -22,6 +27,8 @@ public:
 
   void noteOnEvent(unsigned char note, unsigned char vel);
   void noteOffEvent(unsigned char note);
+  void sustainOnEvent();
+  void sustainOffEvent();
   void channelPressureEvent(unsigned char pressure);
   void generate(sample_t* buffer, int count);
 };

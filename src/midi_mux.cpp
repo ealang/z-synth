@@ -13,40 +13,72 @@ MidiMux::MidiMux(uint32_t sampleRateHz):
 }
 
 void MidiMux::noteOnEvent(unsigned char note, unsigned char vel) {
-  lock_guard<mutex> guard(this->lock);
+  lock_guard<mutex> guard(lock);
 
-  if (notesMap.count(note) == 0) {
-    auto myId = nextId++;
-    auto f = midiNoteToFreq(note);
-    auto s = make_shared<NoteSynth>(this->sampleRateHz, f, vel / 127.f);
-    synths.emplace(make_pair(myId, s));
-    notesMap[note] = myId;
+  if (heldNotes.count(note) == 0) {
+    int myId = nextId++;
+    auto synth = make_shared<NoteSynth>(
+        sampleRateHz,
+        midiNoteToFreq(note),
+        vel / 127.f
+    );
+    heldNotes.insert(note);
+    if (sustained) {
+      sustainedNotes.insert(note);
+    }
+    if (noteSynths.count(note) > 0) {
+      synths[noteSynths[note]].get()->postOffEvent();
+      noteSynths.erase(note);
+    }
+    noteSynths.emplace(make_pair(note, myId));
+    synths.emplace(make_pair(myId, synth));
   }
 }
 
 void MidiMux::noteOffEvent(unsigned char note) {
-  lock_guard<mutex> guard(this->lock);
+  lock_guard<mutex> guard(lock);
 
-  if (notesMap.count(note) > 0) {
-    synths[notesMap[note]].get()->postOffEvent();
-    notesMap.erase(note);
+  if (heldNotes.count(note) > 0) {
+    heldNotes.erase(note);
+    if (!sustained) {
+      synths[noteSynths[note]].get()->postOffEvent();
+      noteSynths.erase(note);
+    }
   }
 }
 
-void MidiMux::channelPressureEvent(unsigned char pressure) {
-  lock_guard<mutex> guard(this->lock);
+void MidiMux::sustainOnEvent() {
+  sustained = true;
+  for (auto note: heldNotes) {
+    sustainedNotes.insert(note);
+  }
+}
 
-  for (auto& kv: this->synths) {
+void MidiMux::sustainOffEvent() {
+  sustained = false;
+  for (auto note: sustainedNotes) {
+    if (heldNotes.count(note) == 0) {
+      synths[noteSynths[note]].get()->postOffEvent();
+      noteSynths.erase(note);
+    }
+  }
+  sustainedNotes.clear();
+}
+
+void MidiMux::channelPressureEvent(unsigned char pressure) {
+  lock_guard<mutex> guard(lock);
+
+  for (auto& kv: synths) {
     kv.second.get()->postPressureEvent(pressure);
   }
 }
 
 void MidiMux::generate(sample_t* buffer, int count) {
-  lock_guard<mutex> guard(this->lock);
+  lock_guard<mutex> guard(lock);
 
   auto dead = unordered_set<int>();
   memset(buffer, 0, count * sizeof(sample_t));
-  for (auto& kv: this->synths) {
+  for (auto& kv: synths) {
     NoteSynth *synth = kv.second.get();
     if (synth->isExhausted()) {
       dead.insert(kv.first);
@@ -55,6 +87,6 @@ void MidiMux::generate(sample_t* buffer, int count) {
     }
   }
   for (auto id: dead) {
-    this->synths.erase(id);
+    synths.erase(id);
   }
 }

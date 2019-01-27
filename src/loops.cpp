@@ -2,7 +2,6 @@
 #include "midi_mux.h"
 
 static int xrunRecovery(snd_pcm_t *const audioDevice, int err) {
-  printf("stream recovery\n");
   if (err == -EPIPE) {    /* under-run */
     err = snd_pcm_prepare(audioDevice);
     if (err < 0)
@@ -49,20 +48,33 @@ int audioLoop(snd_pcm_t *const audioDevice, MidiMux *const mux, int period_size)
 }
 
 static void handleMidiEvent(MidiMux *const mux, snd_seq_t *const midiDevice) {
+  static const unsigned char listenChannel = 0;
+  static const unsigned char sustainControlNumber = 64;
   snd_seq_event_t *ev;
 
   do {
     snd_seq_event_input(midiDevice, &ev);
+    if (ev->data.control.channel != listenChannel) {
+      continue;
+    }
+
     switch (ev->type) {
+      case SND_SEQ_EVENT_CONTROLLER: 
+        if (ev->data.control.param == sustainControlNumber) {
+          if (ev->data.control.value == 0) {
+            mux->sustainOffEvent();
+          } else {
+            mux->sustainOnEvent();
+          }
+        }
+        break;
       case SND_SEQ_EVENT_NOTEON:
-        if (ev->data.note.velocity == 0) {
+      case SND_SEQ_EVENT_NOTEOFF: 
+        if (ev->data.note.velocity == 0 || ev->type == SND_SEQ_EVENT_NOTEOFF) {
           mux->noteOffEvent(ev->data.note.note);
         } else {
           mux->noteOnEvent(ev->data.note.note, ev->data.note.velocity);
         }
-        break;        
-      case SND_SEQ_EVENT_NOTEOFF: 
-        mux->noteOffEvent(ev->data.note.note);
         break;        
       case SND_SEQ_EVENT_CHANPRESS:
         mux->channelPressureEvent(ev->data.control.value);
