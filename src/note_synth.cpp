@@ -5,6 +5,8 @@
 
 using namespace std;
 
+static const float masterAmp = 0.04f;
+
 NoteSynth::NoteSynth(
     float sampleRateHz,
     float freqHz,
@@ -38,8 +40,8 @@ void NoteSynth::generate(uint64_t nSamples, sample_t* buffer) {
       amp = 1;
     }
 
-    float val = sin(this->phase) * amp;
-    sample_t sample = static_cast<sample_t>(val * (maxval / 16));
+    float val = (this->phase > M_PI ? 1 : -1) * amp * masterAmp;
+    sample_t sample = static_cast<sample_t>(val * maxval);
     buffer[i] += sample;
     this->phase += step;
     this->sampleCount++;

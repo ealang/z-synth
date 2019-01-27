@@ -17,8 +17,8 @@ class NoteSynth {
   uint64_t attackSampleSize;
   uint64_t releaseSampleSize;
 
-  const float attackTimeMs = 50;
-  const float releaseTimeMs = 100;
+  const float attackTimeMs = 10;
+  const float releaseTimeMs = 50;
 
 public:
   NoteSynth(
