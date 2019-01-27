@@ -5,12 +5,12 @@ OBJS = $(call TO_OBJS, $(SRC))
 
 obj/%.o: %.cpp
 	@mkdir -p $(dir $@)
-	@g++ -g -Wall -Wextra -Werror -Wfatal-errors -c -std=c++11 -I src -o $@ $^
+	g++ -g -Wall -Wextra -Werror -Wfatal-errors -c -std=c++11 -I src -o $@ $^
 
 # main: main.cpp
 #	g++ -std=c++11 main.cpp -lasound -lm -pthread -o main
 main: $(OBJS)
-	@g++ -o $@ $^  -lasound -lm -pthread
+	g++ -std=c++11 -lasound -lm -pthread -o $@ $^
 
 .PHONY: clean
 clean:

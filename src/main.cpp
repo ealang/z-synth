@@ -1,25 +1,14 @@
-#include <sys/time.h>
-#include <mutex>
-#include <cstdint> 
-#include <utility>      // std::pair
+#include <string>
 #include <stdio.h>
-#include <unordered_set>
-#include <thread>         // std::thread
-#include <memory>
-#include <stdlib.h>
-#include <unistd.h>
-#include <alsa/asoundlib.h>
-#include <unordered_map>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sched.h>
+#include <thread>
 #include <errno.h>
 #include <getopt.h>
+
 #include <alsa/asoundlib.h>
-#include <string>
-#include <math.h>
+
+#include "types.h"
+#include "note_synth.h"
+#include "midi_mux.h"
 
 using namespace std;
 
@@ -37,128 +26,7 @@ static snd_pcm_sframes_t buffer_size;
 static snd_pcm_sframes_t period_size;
 static snd_output_t *output = NULL;
 
-typedef int16_t sample_t;
-
-class NoteSynth {
-  float sampleRateHz;
-  float freqHz;
-  float velocity;
-
-  double phase = 0;
-  bool off = false;
-  uint64_t sampleCount = 0;
-  uint64_t offSample = 0;
-
-  uint64_t attackSampleSize;
-  uint64_t releaseSampleSize;
-
-  const float attackTimeMs = 50;
-  const float releaseTimeMs = 100;
-
-public:
-  NoteSynth(
-      float sampleRateHz,
-      float freqHz,
-      float velocity
-  ): sampleRateHz(sampleRateHz),
-     freqHz(freqHz),
-     velocity(velocity),
-     attackSampleSize((attackTimeMs / 1000) * sampleRateHz),
-     releaseSampleSize((releaseTimeMs / 1000) * sampleRateHz)
-  { }
-
-  bool isExhausted() {
-    return this->off && this->sampleCount >= this->offSample + this->releaseSampleSize;
-  }
-
-  void generate(uint64_t nSamples, sample_t* buffer) {
-    static double max_phase = 2. * M_PI;
-    double step = max_phase * this->freqHz / (double)this->sampleRateHz;
-    unsigned int maxval = (1 << 15) - 1;
-    for (uint64_t i = 0; i < nSamples; i++) {
-
-      float amp;
-      if (this->sampleCount < this->attackSampleSize) {
-        amp = (float)this->sampleCount / this->attackSampleSize;
-      } else if (this->off) {
-        amp = max(
-            0.f,
-            1 - (float)(this->sampleCount - this->offSample) / this->releaseSampleSize
-        );
-      } else {
-        amp = 1;
-      }
-
-      float val = sin(this->phase) * amp;
-      sample_t sample = static_cast<sample_t>(val * (maxval / 16));
-      buffer[i] += sample;
-      this->phase += step;
-      this->sampleCount++;
-      if (this->phase >= max_phase)
-        this->phase -= max_phase;
-    }
-  }
-
-  void postOffEvent() {
-    this->offSample = this->sampleCount;
-    this->off = true;
-  }
-};
-
-float midiNoteToFreq(unsigned char note) {
-  return 440 * powf(2, (static_cast<float>(note) - 69) / 12);
-}
-
-class NoteMux {
-  unordered_map<unsigned char, int> notesMap;
-  unordered_map<int, shared_ptr<NoteSynth>> synths;
-  uint64_t nextId = 0;
-  mutex lock;
-
-public:
-
-  void noteOnEvent(unsigned char note, unsigned char vel) {
-    lock_guard<mutex> guard(this->lock);
-
-    if (notesMap.count(note) == 0) {
-      auto myId = nextId++;
-      auto f = midiNoteToFreq(note);
-      auto s = make_shared<NoteSynth>(rate, f, vel / 127.f);
-      printf("adding client %d with freq %f\n", (int)myId, f);
-      synths.emplace(make_pair(myId, s));
-      notesMap[note] = myId;
-    }
-  }
-  void noteOffEvent(unsigned char note) {
-    lock_guard<mutex> guard(this->lock);
-
-    if (notesMap.count(note) > 0) {
-      synths[notesMap[note]].get()->postOffEvent();
-      notesMap.erase(note);
-    }
-  }
-
-  void generate(sample_t* buffer, int count) {
-    lock_guard<mutex> guard(this->lock);
-
-    auto dead = unordered_set<int>();
-    memset(buffer, 0, count * sizeof(sample_t));
-    for (auto& kv: this->synths) {
-      NoteSynth *synth = kv.second.get();
-      if (synth->isExhausted()) {
-        dead.insert(kv.first);
-      } else {
-        synth->generate(count, buffer);
-      }
-    }
-    for (auto id: dead) {
-      printf("erasing client %d\n", id);
-      this->synths.erase(id);
-    }
-  }
-};
-
-NoteMux noteMux;
+MidiMux midiMux(rate);
 
 snd_seq_t *open_seq() {
 
@@ -186,33 +54,24 @@ void midi_action(snd_seq_t *seq_handle) {
   do {
     snd_seq_event_input(seq_handle, &ev);
     switch (ev->type) {
-      /*
-      case SND_SEQ_EVENT_CONTROLLER: 
-        fprintf(stderr, "Control event on Channel %2d: %5d       \n",
-                ev->data.control.channel, ev->data.control.value);
-        break;
-      case SND_SEQ_EVENT_PITCHBEND:
-        fprintf(stderr, "Pitchbender event on Channel %2d: %5d   \n", 
-                ev->data.control.channel, ev->data.control.value);
-        break;
-      */
       case SND_SEQ_EVENT_NOTEON:
         fprintf(stderr, "Note On event on Channel %d: %d (vel %d)\n",
                 ev->data.control.channel, ev->data.note.note, ev->data.note.velocity);
         if (ev->data.note.velocity == 0) {
-          noteMux.noteOffEvent(ev->data.note.note);
+          midiMux.noteOffEvent(ev->data.note.note);
         } else {
-          noteMux.noteOnEvent(ev->data.note.note, ev->data.note.velocity);
+          midiMux.noteOnEvent(ev->data.note.note, ev->data.note.velocity);
         }
         break;        
       case SND_SEQ_EVENT_NOTEOFF: 
         fprintf(stderr, "Note Off event on Channel %d: %d\n",         
                 ev->data.control.channel, ev->data.note.note);           
-        noteMux.noteOffEvent(ev->data.note.note);
+        midiMux.noteOffEvent(ev->data.note.note);
         break;        
       case SND_SEQ_EVENT_CHANPRESS:
         fprintf(stderr, "Aftertouch event on Channel %d: %d\n",         
                 ev->data.control.channel, ev->data.control.value);
+        midiMux.channelPressureEvent(ev->data.control.value);
         break;        
     }
     snd_seq_free_event(ev);
@@ -383,7 +242,7 @@ static int write_loop(snd_pcm_t *handle,
         signed short *ptr;
         int err, cptr;
         while (1) {
-                noteMux.generate(samples, period_size);
+                midiMux.generate(samples, period_size);
                 ptr = samples;
                 cptr = period_size;
                 while (cptr > 0) {
