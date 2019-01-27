@@ -1,5 +1,13 @@
 #include <sys/time.h>
 #include <cstdint> 
+#include <utility>      // std::pair
+#include <stdio.h>
+#include <unordered_set>
+#include <memory>
+#include <stdlib.h>
+#include <unistd.h>
+#include <alsa/asoundlib.h>
+#include <unordered_map>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,9 +50,12 @@ class NoteSynth {
   float velocity;
   uint64_t timeOn;
 
+  double phase = 0;
+  bool off = false;
+
 public:
   NoteSynth(
-      float sampleRateHz,
+      unsigned int sampleRateHz,
       float freqHz,
       float velocity,
       uint64_t timeOn
@@ -54,19 +65,148 @@ public:
      timeOn(timeOn)
   { }
 
+  ~NoteSynth() {
+    printf("delete notesynth\n");
+  }
+
   bool isExhausted() {
-    return false;
+    return this->off;
   }
-  int generate(uint64_t nSamples, int* buffer) {
-    return 0;
+
+  int generate(uint64_t nSamples, sample_t* buffer) {
+    static double max_phase = 2. * M_PI;
+    double step = max_phase * this->freqHz / (double)this->sampleRateHz;
+    unsigned int maxval = (1 << 15) - 1;
+    bool big_endian = snd_pcm_format_big_endian(format) == 1;
+    for (int i = 0; i < nSamples; i++) {
+      sample_t sample = static_cast<sample_t>(sin(this->phase) * (maxval / 16));
+      buffer[i] += sample;
+      this->phase += step;
+      if (this->phase >= max_phase)
+        this->phase -= max_phase;
+    }
   }
-  void postEvent() {
+
+  void postOffEvent(uint64_t time) {
+    this->off = true;
   }
 };
 
+float midiNoteToFreq(unsigned char note) {
+  return 440 * powf(2, (static_cast<float>(note) - 69) / 12);
+}
+
+class NoteMux {
+  unordered_map<unsigned char, int> notesMap;
+  unordered_map<int, shared_ptr<NoteSynth>> synths;
+  uint64_t nextId = 0;
+
+public:
+
+  void noteOnEvent(unsigned char note, unsigned char vel, uint64_t time) {
+    if (notesMap.count(note) == 0) {
+      auto myId = nextId++;
+      auto f = midiNoteToFreq(note);
+      auto s = make_shared<NoteSynth>(rate, f, 1, time);
+      printf("adding client %d with freq %f\n", (int)myId, f);
+      synths.emplace(make_pair(myId, s));
+      notesMap[note] = myId;
+    }
+  }
+  void noteOffEvent(unsigned char note, unsigned char vel, uint64_t time) {
+    if (notesMap.count(note) > 0) {
+      synths[notesMap[note]].get()->postOffEvent(time);
+      printf("removing client %d\n", notesMap[note]);
+      notesMap.erase(note);
+    }
+  }
+
+  void generate(sample_t* buffer, int count) {
+    // TODO: must delete dead synths
+    auto dead = unordered_set<int>();
+    memset(buffer, 0, count * sizeof(sample_t));
+    for (auto& kv: this->synths) {
+      NoteSynth *synth = kv.second.get();
+      if (synth->isExhausted()) {
+        dead.insert(kv.first);
+      } else {
+        synth->generate(count, buffer);
+      }
+    }
+    for (auto id: dead) {
+      printf("erasing synth %d\n", id);
+      this->synths.erase(id);
+    }
+  }
+};
+
+NoteMux noteMux;
+
+snd_seq_t *open_seq() {
+
+  snd_seq_t *seq_handle;
+  int portid;
+
+  if (snd_seq_open(&seq_handle, "hw", SND_SEQ_OPEN_DUPLEX, 0) < 0) {
+    fprintf(stderr, "Error opening ALSA sequencer.\n");
+    exit(1);
+  }
+  snd_seq_set_client_name(seq_handle, "ALSA Sequencer Demo");
+  if ((portid = snd_seq_create_simple_port(seq_handle, "ALSA Sequencer Demo",
+            SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE,
+            SND_SEQ_PORT_TYPE_APPLICATION)) < 0) {
+    fprintf(stderr, "Error creating sequencer port.\n");
+    exit(1);
+  }
+  return(seq_handle);
+}
+
+void midi_action(snd_seq_t *seq_handle) {
+
+  snd_seq_event_t *ev;
+
+  do {
+    snd_seq_event_input(seq_handle, &ev);
+    switch (ev->type) {
+      /*
+      case SND_SEQ_EVENT_CONTROLLER: 
+        fprintf(stderr, "Control event on Channel %2d: %5d       \n",
+                ev->data.control.channel, ev->data.control.value);
+        break;
+      case SND_SEQ_EVENT_PITCHBEND:
+        fprintf(stderr, "Pitchbender event on Channel %2d: %5d   \n", 
+                ev->data.control.channel, ev->data.control.value);
+        break;
+      */
+      case SND_SEQ_EVENT_NOTEON:
+        fprintf(stderr, "Note On event on Channel %d: %d (vel %d)\n",
+                ev->data.control.channel, ev->data.note.note, ev->data.note.velocity);
+        if (ev->data.note.velocity == 0) {
+          noteMux.noteOffEvent(ev->data.note.note, ev->data.note.velocity, getTime());
+        } else {
+          noteMux.noteOnEvent(ev->data.note.note, ev->data.note.velocity, getTime());
+        }
+        break;        
+      case SND_SEQ_EVENT_NOTEOFF: 
+        fprintf(stderr, "Note Off event on Channel %2: %d\n",         
+                ev->data.control.channel, ev->data.note.note);           
+        noteMux.noteOffEvent(ev->data.note.note, ev->data.note.velocity, getTime());
+        break;        
+      case SND_SEQ_EVENT_CHANPRESS:
+        fprintf(stderr, "Aftertouch event on Channel %d: %d\n",         
+                ev->data.control.channel, ev->data.control.value);
+        break;        
+    }
+    snd_seq_free_event(ev);
+  } while (snd_seq_event_input_pending(seq_handle, 0) > 0);
+}
+
+
 static void generate_sine(sample_t* samples, int count, double *_phase)
 {
-
+  // TODO: thread safety
+  noteMux.generate(samples, count);
+  /*
   static double max_phase = 2. * M_PI;
   double phase = *_phase;
   double step = max_phase * freq / (double)rate;
@@ -80,6 +220,7 @@ static void generate_sine(sample_t* samples, int count, double *_phase)
       phase -= max_phase;
   }
   *_phase = phase;
+  */
 }
 
 static void help(void)
@@ -167,6 +308,8 @@ static int set_hwparams(snd_pcm_t *handle,
                 return err;
         }
         period_size = size;
+
+        printf("buffer size %d period size %d\n", buffer_size, period_size);
         /* write the parameters to device */
         err = snd_pcm_hw_params(handle, params);
         if (err < 0) {
@@ -227,6 +370,7 @@ static void async_callback(snd_async_handler_t *ahandler)
 {
         snd_pcm_t *handle = snd_async_handler_get_pcm(ahandler);
         struct async_private_data *data = (async_private_data *)snd_async_handler_get_callback_private(ahandler);
+
         sample_t *samples = data->samples;
         snd_pcm_sframes_t avail;
         int err;
@@ -237,7 +381,7 @@ static void async_callback(snd_async_handler_t *ahandler)
                 err = snd_pcm_writei(handle, samples, period_size);
                 if (err < 0) {
                         printf("Write error: %s\n", snd_strerror(err));
-                        exit(EXIT_FAILURE);
+                        // exit(EXIT_FAILURE);
                 }
                 if (err != period_size) {
                         printf("Write error: written %i expected %li\n", err, period_size);
@@ -248,18 +392,16 @@ static void async_callback(snd_async_handler_t *ahandler)
 }
 static int async_loop(snd_pcm_t* handle,
                       sample_t* samples) {
-        struct async_private_data data;
+        async_private_data *data = new async_private_data { samples, 0 };
         snd_async_handler_t *ahandler;
         int err, count;
-        data.samples = samples;
-        data.phase = 0;
-        err = snd_async_add_pcm_handler(&ahandler, handle, async_callback, &data);
+        err = snd_async_add_pcm_handler(&ahandler, handle, async_callback, data);
         if (err < 0) {
                 printf("Unable to register async handler\n");
                 exit(EXIT_FAILURE);
         }
         for (count = 0; count < 2; count++) {
-                generate_sine(samples, period_size, &data.phase);
+                generate_sine(samples, period_size, &data->phase);
                 err = snd_pcm_writei(handle, samples, period_size);
                 if (err < 0) {
                         printf("Initial write error: %s\n", snd_strerror(err));
@@ -277,12 +419,6 @@ static int async_loop(snd_pcm_t* handle,
                         exit(EXIT_FAILURE);
                 }
         }
-
-    /* because all other work is done in the signal handler,
-       suspend the process */
-    while (1) {
-            sleep(1);
-    }
 }
 
 
@@ -371,6 +507,25 @@ int main(int argc, char *argv[])
   err = async_loop(handle, samples);
   if (err < 0)
     printf("Transfer failed: %s\n", snd_strerror(err));
+
+
+
+  snd_seq_t *seq_handle;
+  int npfd;
+  struct pollfd *pfd;
+    
+  seq_handle = open_seq();
+  npfd = snd_seq_poll_descriptors_count(seq_handle, POLLIN);
+  pfd = (struct pollfd *)alloca(npfd * sizeof(struct pollfd));
+  snd_seq_poll_descriptors(seq_handle, pfd, npfd, POLLIN);
+  while (1) {
+    if (poll(pfd, npfd, 1000000) > 0) {
+      midi_action(seq_handle);
+    }  
+  }
+
+
+
 
   delete[] samples;
   snd_pcm_close(handle);
