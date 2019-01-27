@@ -1,6 +1,8 @@
 # z-synth
 
-A minimal synth that uses ALSA.
+A minimal synth that uses ALSA. The intention is to provide a synth that can operate with low latency even on low performance devices (e.g. a raspi).
+
+Currently only a square wave and this project is in a hacky state.
 
 Build:
 
