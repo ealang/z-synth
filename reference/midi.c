@@ -33,27 +33,21 @@ void midi_action(snd_seq_t *seq_handle) {
   do {
     snd_seq_event_input(seq_handle, &ev);
     switch (ev->type) {
-      /*
       case SND_SEQ_EVENT_CONTROLLER: 
-        fprintf(stderr, "Control event on Channel %2d: %5d       \n",
+        fprintf(stderr, "Control event on Channel %2d: %5d       \r",
                 ev->data.control.channel, ev->data.control.value);
         break;
       case SND_SEQ_EVENT_PITCHBEND:
-        fprintf(stderr, "Pitchbender event on Channel %2d: %5d   \n", 
+        fprintf(stderr, "Pitchbender event on Channel %2d: %5d   \r", 
                 ev->data.control.channel, ev->data.control.value);
         break;
-      */
       case SND_SEQ_EVENT_NOTEON:
-        fprintf(stderr, "Note On event on Channel %d: %d (vel %d)\n",
-                ev->data.control.channel, ev->data.note.note, ev->data.note.velocity);
+        fprintf(stderr, "Note On event on Channel %2d: %5d       \r",
+                ev->data.control.channel, ev->data.note.note);
         break;        
       case SND_SEQ_EVENT_NOTEOFF: 
-        fprintf(stderr, "Note Off event on Channel %2: %d\n",         
+        fprintf(stderr, "Note Off event on Channel %2d: %5d      \r",         
                 ev->data.control.channel, ev->data.note.note);           
-        break;        
-      case SND_SEQ_EVENT_CHANPRESS:
-        fprintf(stderr, "Aftertouch event on Channel %d: %d\n",         
-                ev->data.control.channel, ev->data.control.value);
         break;        
     }
     snd_seq_free_event(ev);

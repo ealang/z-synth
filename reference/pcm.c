@@ -8,10 +8,10 @@
 #include <sched.h>
 #include <errno.h>
 #include <getopt.h>
-#include <alsa/asoundlib.h>
+#include "../include/asoundlib.h"
 #include <sys/time.h>
 #include <math.h>
-static char *device = "hw:1,0";                     /* playback device */
+static char *device = "plughw:0,0";                     /* playback device */
 static snd_pcm_format_t format = SND_PCM_FORMAT_S16;    /* sample format */
 static unsigned int rate = 44100;                       /* stream rate */
 static unsigned int channels = 1;                       /* count of channels */
