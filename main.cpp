@@ -49,21 +49,28 @@ class NoteSynth {
   float sampleRateHz;
   float freqHz;
   float velocity;
-  uint64_t timeOn;
 
   double phase = 0;
   bool off = false;
+  uint64_t sampleCount = 0;
+  uint64_t offSample = 0;
+
+  uint64_t attackSampleSize;
+  uint64_t releaseSampleSize;
+
+  const float attackTimeMs = 50;
+  const float releaseTimeMs = 100;
 
 public:
   NoteSynth(
-      unsigned int sampleRateHz,
+      float sampleRateHz,
       float freqHz,
-      float velocity,
-      uint64_t timeOn
+      float velocity
   ): sampleRateHz(sampleRateHz),
      freqHz(freqHz),
      velocity(velocity),
-     timeOn(timeOn)
+     attackSampleSize((attackTimeMs / 1000) * sampleRateHz),
+     releaseSampleSize((releaseTimeMs / 1000) * sampleRateHz)
   { }
 
   ~NoteSynth() {
@@ -71,7 +78,7 @@ public:
   }
 
   bool isExhausted() {
-    return this->off;
+    return this->off && this->sampleCount >= this->offSample + this->releaseSampleSize;
   }
 
   int generate(uint64_t nSamples, sample_t* buffer) {
@@ -80,15 +87,31 @@ public:
     unsigned int maxval = (1 << 15) - 1;
     bool big_endian = snd_pcm_format_big_endian(format) == 1;
     for (int i = 0; i < nSamples; i++) {
-      sample_t sample = static_cast<sample_t>(sin(this->phase) * (maxval / 16));
+
+      float amp;
+      if (this->sampleCount < this->attackSampleSize) {
+        amp = (float)this->sampleCount / this->attackSampleSize;
+      } else if (this->off) {
+        amp = max(
+            0.f,
+            1 - (float)(this->sampleCount - this->offSample) / this->releaseSampleSize
+        );
+      } else {
+        amp = 1;
+      }
+
+      float val = sin(this->phase) * amp;
+      sample_t sample = static_cast<sample_t>(val * (maxval / 16));
       buffer[i] += sample;
       this->phase += step;
+      this->sampleCount++;
       if (this->phase >= max_phase)
         this->phase -= max_phase;
     }
   }
 
   void postOffEvent(uint64_t time) {
+    this->offSample = this->sampleCount;
     this->off = true;
   }
 };
@@ -108,7 +131,7 @@ public:
     if (notesMap.count(note) == 0) {
       auto myId = nextId++;
       auto f = midiNoteToFreq(note);
-      auto s = make_shared<NoteSynth>(rate, f, 1, time);
+      auto s = make_shared<NoteSynth>(rate, f, 1);
       printf("adding client %d with freq %f\n", (int)myId, f);
       synths.emplace(make_pair(myId, s));
       notesMap[note] = myId;
@@ -360,70 +383,6 @@ static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams)
         return 0;
 }
 
-/*
- *   Transfer method - asynchronous notification
- */
-/*
-struct async_private_data {
-        sample_t* samples;
-        double phase;
-};
-static void async_callback(snd_async_handler_t *ahandler)
-{
-        snd_pcm_t *handle = snd_async_handler_get_pcm(ahandler);
-        struct async_private_data *data = (async_private_data *)snd_async_handler_get_callback_private(ahandler);
-
-        sample_t *samples = data->samples;
-        snd_pcm_sframes_t avail;
-        int err;
-        
-        avail = snd_pcm_avail_update(handle);
-        while (avail >= period_size) {
-                generate_sine(data->samples, period_size, &data->phase);
-                err = snd_pcm_writei(handle, samples, period_size);
-                if (err < 0) {
-                        printf("Write error: %s\n", snd_strerror(err));
-                        // exit(EXIT_FAILURE);
-                }
-                if (err != period_size) {
-                        printf("Write error: written %i expected %li\n", err, period_size);
-                        exit(EXIT_FAILURE);
-                }
-                avail = snd_pcm_avail_update(handle);
-        }
-}
-static int async_loop(snd_pcm_t* handle,
-                      sample_t* samples) {
-        async_private_data *data = new async_private_data { samples, 0 };
-        snd_async_handler_t *ahandler;
-        int err, count;
-        err = snd_async_add_pcm_handler(&ahandler, handle, async_callback, data);
-        if (err < 0) {
-                printf("Unable to register async handler\n");
-                exit(EXIT_FAILURE);
-        }
-        for (count = 0; count < 2; count++) {
-                generate_sine(samples, period_size, &data->phase);
-                err = snd_pcm_writei(handle, samples, period_size);
-                if (err < 0) {
-                        printf("Initial write error: %s\n", snd_strerror(err));
-                        exit(EXIT_FAILURE);
-                }
-                if (err != period_size) {
-                        printf("Initial write error: written %i expected %li\n", err, period_size);
-                        exit(EXIT_FAILURE);
-                }
-        }
-        if (snd_pcm_state(handle) == SND_PCM_STATE_PREPARED) {
-                err = snd_pcm_start(handle);
-                if (err < 0) {
-                        printf("Start error: %s\n", snd_strerror(err));
-                        exit(EXIT_FAILURE);
-                }
-        }
-}
-*/
-
 static int xrun_recovery(snd_pcm_t *handle, int err)
 {
         if (verbose)
@@ -571,10 +530,6 @@ int main(int argc, char *argv[])
     snd_pcm_dump(handle, output);
   printf("allocated %d\n", period_size);
   samples = new sample_t[period_size];
-  noteMux.noteOnEvent(45, 100, 0);
-  // write_loop(handle, samples);
-  if (err < 0)
-    printf("Transfer failed: %s\n", snd_strerror(err));
 
   thread audioThread(write_loop, handle, samples);
   thread midiThread(read_loop);
