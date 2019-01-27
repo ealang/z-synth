@@ -48,6 +48,8 @@ void MidiMux::noteOffEvent(unsigned char note) {
 }
 
 void MidiMux::sustainOnEvent() {
+  lock_guard<mutex> guard(lock);
+
   sustained = true;
   for (auto note: heldNotes) {
     sustainedNotes.insert(note);
@@ -55,6 +57,8 @@ void MidiMux::sustainOnEvent() {
 }
 
 void MidiMux::sustainOffEvent() {
+  lock_guard<mutex> guard(lock);
+
   sustained = false;
   for (auto note: sustainedNotes) {
     if (heldNotes.count(note) == 0) {
