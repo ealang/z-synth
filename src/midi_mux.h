@@ -16,7 +16,6 @@ class MidiMux {
   uint64_t nextId = 0;
   uint32_t sampleRateHz;
 
-
 public:
 
   MidiMux(uint32_t sampleRateHz);

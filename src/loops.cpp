@@ -55,8 +55,6 @@ static void handleMidiEvent(MidiMux *const mux, snd_seq_t *const midiDevice) {
     snd_seq_event_input(midiDevice, &ev);
     switch (ev->type) {
       case SND_SEQ_EVENT_NOTEON:
-        fprintf(stderr, "Note On event on Channel %d: %d (vel %d)\n",
-            ev->data.control.channel, ev->data.note.note, ev->data.note.velocity);
         if (ev->data.note.velocity == 0) {
           mux->noteOffEvent(ev->data.note.note);
         } else {
@@ -64,13 +62,9 @@ static void handleMidiEvent(MidiMux *const mux, snd_seq_t *const midiDevice) {
         }
         break;        
       case SND_SEQ_EVENT_NOTEOFF: 
-        fprintf(stderr, "Note Off event on Channel %d: %d\n",         
-            ev->data.control.channel, ev->data.note.note);           
         mux->noteOffEvent(ev->data.note.note);
         break;        
       case SND_SEQ_EVENT_CHANPRESS:
-        fprintf(stderr, "Aftertouch event on Channel %d: %d\n",         
-            ev->data.control.channel, ev->data.control.value);
         mux->channelPressureEvent(ev->data.control.value);
         break;        
     }

@@ -11,7 +11,7 @@
 
 using namespace std;
 
-const static string midiDeviceName = "0synth";
+const static string midiDeviceName = "z-synth";
 static string device = "hw:0,0";          /* playback device */
 static unsigned int rate = 44100;         /* stream rate */
 static unsigned int bufferTimeMs = 20;  /* ring buffer length in ms */
@@ -95,7 +95,7 @@ static int setHwParams(snd_pcm_t *audioDevice,
     return err;
   }
   if (rrate != rate) {
-    printf("Rate doesn't match (requested %iHz, get %iHz)\n", rate, err);
+    printf("Rate doesn't match (requested %iHz, got %iHz)\n", rate, err);
     return -EINVAL;
   }
   /* set the buffer time */
@@ -125,7 +125,7 @@ static int setHwParams(snd_pcm_t *audioDevice,
   }
   periodSize = size;
 
-  printf("buffer size %d period size %d\n", (int)bufferSize, (int)periodSize);
+  printf("Buffer size: %d samples\nPeriod size %d samples\n", (int)bufferSize, (int)periodSize);
   /* write the parameters to device */
   err = snd_pcm_hw_params(audioDevice, params);
   if (err < 0) {

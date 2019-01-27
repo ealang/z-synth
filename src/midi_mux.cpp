@@ -19,7 +19,6 @@ void MidiMux::noteOnEvent(unsigned char note, unsigned char vel) {
     auto myId = nextId++;
     auto f = midiNoteToFreq(note);
     auto s = make_shared<NoteSynth>(this->sampleRateHz, f, vel / 127.f);
-    printf("adding client %d with freq %f\n", (int)myId, f);
     synths.emplace(make_pair(myId, s));
     notesMap[note] = myId;
   }
@@ -56,7 +55,6 @@ void MidiMux::generate(sample_t* buffer, int count) {
     }
   }
   for (auto id: dead) {
-    printf("erasing client %d\n", id);
     this->synths.erase(id);
   }
 }
