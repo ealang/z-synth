@@ -1,5 +1,5 @@
 main: main.cpp
-	g++ -std=c++11 main.cpp -lasound -lm -o main
+	g++ -std=c++11 main.cpp -lasound -lm -pthread -o main
 
 pcm: pcm.c
 	gcc pcm.c -lasound -lm -o pcm

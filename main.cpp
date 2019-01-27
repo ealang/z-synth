@@ -3,6 +3,7 @@
 #include <utility>      // std::pair
 #include <stdio.h>
 #include <unordered_set>
+#include <thread>         // std::thread
 #include <memory>
 #include <stdlib.h>
 #include <unistd.h>
@@ -362,6 +363,7 @@ static int set_swparams(snd_pcm_t *handle, snd_pcm_sw_params_t *swparams)
 /*
  *   Transfer method - asynchronous notification
  */
+/*
 struct async_private_data {
         sample_t* samples;
         double phase;
@@ -420,7 +422,72 @@ static int async_loop(snd_pcm_t* handle,
                 }
         }
 }
+*/
 
+static int xrun_recovery(snd_pcm_t *handle, int err)
+{
+        if (verbose)
+                printf("stream recovery\n");
+        if (err == -EPIPE) {    /* under-run */
+                err = snd_pcm_prepare(handle);
+                if (err < 0)
+                        printf("Can't recovery from underrun, prepare failed: %s\n", snd_strerror(err));
+                return 0;
+        } else if (err == -ESTRPIPE) {
+                while ((err = snd_pcm_resume(handle)) == -EAGAIN)
+                        sleep(1);       /* wait until the suspend flag is released */
+                if (err < 0) {
+                        err = snd_pcm_prepare(handle);
+                        if (err < 0)
+                                printf("Can't recovery from suspend, prepare failed: %s\n", snd_strerror(err));
+                }
+                return 0;
+        }
+        return err;
+}
+
+static int write_loop(snd_pcm_t *handle,
+                      signed short *samples)
+{
+        double phase = 0;
+        signed short *ptr;
+        int err, cptr;
+        while (1) {
+                generate_sine(samples, period_size, &phase);
+                ptr = samples;
+                cptr = period_size;
+                while (cptr > 0) {
+                        err = snd_pcm_writei(handle, ptr, cptr);
+                        if (err == -EAGAIN)
+                                continue;
+                        if (err < 0) {
+                                if (xrun_recovery(handle, err) < 0) {
+                                        printf("Write error: %s\n", snd_strerror(err));
+                                        exit(EXIT_FAILURE);
+                                }
+                                break;  /* skip one period */
+                        }
+                        ptr += err * channels;
+                        cptr -= err;
+                }
+        }
+}
+
+int read_loop() {
+  snd_seq_t *seq_handle;
+  int npfd;
+  struct pollfd *pfd;
+    
+  seq_handle = open_seq();
+  npfd = snd_seq_poll_descriptors_count(seq_handle, POLLIN);
+  pfd = (struct pollfd *)alloca(npfd * sizeof(struct pollfd));
+  snd_seq_poll_descriptors(seq_handle, pfd, npfd, POLLIN);
+  while (1) {
+    if (poll(pfd, npfd, 1000000) > 0) {
+      midi_action(seq_handle);
+    }  
+  }
+}
 
 int main(int argc, char *argv[])
 {
@@ -504,28 +571,16 @@ int main(int argc, char *argv[])
     snd_pcm_dump(handle, output);
   printf("allocated %d\n", period_size);
   samples = new sample_t[period_size];
-  err = async_loop(handle, samples);
+  noteMux.noteOnEvent(45, 100, 0);
+  // write_loop(handle, samples);
   if (err < 0)
     printf("Transfer failed: %s\n", snd_strerror(err));
 
+  thread audioThread(write_loop, handle, samples);
+  thread midiThread(read_loop);
 
-
-  snd_seq_t *seq_handle;
-  int npfd;
-  struct pollfd *pfd;
-    
-  seq_handle = open_seq();
-  npfd = snd_seq_poll_descriptors_count(seq_handle, POLLIN);
-  pfd = (struct pollfd *)alloca(npfd * sizeof(struct pollfd));
-  snd_seq_poll_descriptors(seq_handle, pfd, npfd, POLLIN);
-  while (1) {
-    if (poll(pfd, npfd, 1000000) > 0) {
-      midi_action(seq_handle);
-    }  
-  }
-
-
-
+  audioThread.join();
+  midiThread.join();
 
   delete[] samples;
   snd_pcm_close(handle);
