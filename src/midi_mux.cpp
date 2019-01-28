@@ -6,7 +6,8 @@
 
 using namespace std;
 
-static const float masterAmp = 0.005f;
+static const float masterAmp = 0.04f;
+static const uint32_t filterLen = 4;
 
 static float midiNoteToFreq(unsigned char note) {
   return 440 * powf(2, (static_cast<float>(note) - 69) / 12);
@@ -17,7 +18,8 @@ MidiMux::MidiMux(
   uint32_t channelCount
 ):
   sampleRateHz(sampleRateHz),
-  channelCount(channelCount) {
+  channelCount(channelCount),
+  filters(channelCount, Filter(filterLen)) {
 }
 
 void MidiMux::noteOnEvent(unsigned char note, unsigned char vel) {
@@ -100,8 +102,11 @@ void MidiMux::generate(uint32_t nSamples, float* buffer) {
     }
   }
 
-  for (uint32_t i = 0; i < nSamples * channelCount; i++) {
-    buffer[i] *= masterAmp;
+  for (uint32_t i = 0; i < nSamples; i++) {
+    for (uint32_t c = 0; c < channelCount; c++) {
+      int j = i * channelCount + c;
+      buffer[j] = filters[c].next(buffer[j]) * masterAmp;
+    }
   }
 
   for (auto id: dead) {

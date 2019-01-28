@@ -6,8 +6,10 @@
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "note_synth.h"
+#include "filter.h"
 
 class MidiMux {
   uint32_t sampleRateHz;
@@ -18,6 +20,7 @@ class MidiMux {
 
   std::unordered_map<unsigned char, int> noteSynths;
   std::unordered_map<uint32_t, std::shared_ptr<NoteSynth>> synths;
+  std::vector<Filter> filters;
 
   std::mutex lock;
   bool sustained=false;
