@@ -38,7 +38,7 @@ void MidiMux::noteOnEvent(unsigned char note, unsigned char vel) {
       sustainedNotes.insert(note);
     }
     if (noteSynths.count(note) > 0) {
-      synths[noteSynths[note]].get()->postOffEvent();
+      synths[noteSynths[note]]->postOffEvent();
       noteSynths.erase(note);
     }
     noteSynths.emplace(make_pair(note, myId));
@@ -52,7 +52,7 @@ void MidiMux::noteOffEvent(unsigned char note) {
   if (heldNotes.count(note) > 0) {
     heldNotes.erase(note);
     if (!sustained) {
-      synths[noteSynths[note]].get()->postOffEvent();
+      synths[noteSynths[note]]->postOffEvent();
       noteSynths.erase(note);
     }
   }
@@ -73,7 +73,7 @@ void MidiMux::sustainOffEvent() {
   sustained = false;
   for (auto note: sustainedNotes) {
     if (heldNotes.count(note) == 0) {
-      synths[noteSynths[note]].get()->postOffEvent();
+      synths[noteSynths[note]]->postOffEvent();
       noteSynths.erase(note);
     }
   }
@@ -84,7 +84,7 @@ void MidiMux::channelPressureEvent(unsigned char pressure) {
   lock_guard<mutex> guard(lock);
 
   for (auto& kv: synths) {
-    kv.second.get()->postPressureEvent(pressure);
+    kv.second->postPressureEvent(pressure);
   }
 }
 
@@ -94,7 +94,7 @@ void MidiMux::generate(uint32_t nSamples, float* buffer) {
   auto dead = unordered_set<int>();
 
   for (auto& kv: synths) {
-    NoteSynth *synth = kv.second.get();
+    auto synth = kv.second;
     if (synth->isExhausted()) {
       dead.insert(kv.first);
     } else {
