@@ -2,27 +2,21 @@
 #include <math.h>
 #include <vector>
 
-#include "midi_mux.h"
+#include "./generator_element.h"
 
 using namespace std;
-
-static const float masterAmp = 0.04f;
-static const uint32_t filterLen = 4;
 
 static float midiNoteToFreq(unsigned char note) {
   return 440 * powf(2, (static_cast<float>(note) - 69) / 12);
 }
 
-MidiMux::MidiMux(
+GeneratorElement::GeneratorElement(
   uint32_t sampleRateHz,
   uint32_t channelCount
-):
-  sampleRateHz(sampleRateHz),
-  channelCount(channelCount),
-  filters(channelCount, Filter(filterLen)) {
+): sampleRateHz(sampleRateHz), channelCount(channelCount) {
 }
 
-void MidiMux::noteOnEvent(unsigned char note, unsigned char vel) {
+void GeneratorElement::noteOnEvent(unsigned char note, unsigned char vel) {
   lock_guard<mutex> guard(lock);
 
   if (heldNotes.count(note) == 0) {
@@ -46,7 +40,7 @@ void MidiMux::noteOnEvent(unsigned char note, unsigned char vel) {
   }
 }
 
-void MidiMux::noteOffEvent(unsigned char note) {
+void GeneratorElement::noteOffEvent(unsigned char note) {
   lock_guard<mutex> guard(lock);
 
   if (heldNotes.count(note) > 0) {
@@ -58,7 +52,7 @@ void MidiMux::noteOffEvent(unsigned char note) {
   }
 }
 
-void MidiMux::sustainOnEvent() {
+void GeneratorElement::sustainOnEvent() {
   lock_guard<mutex> guard(lock);
 
   sustained = true;
@@ -67,7 +61,7 @@ void MidiMux::sustainOnEvent() {
   }
 }
 
-void MidiMux::sustainOffEvent() {
+void GeneratorElement::sustainOffEvent() {
   lock_guard<mutex> guard(lock);
 
   sustained = false;
@@ -80,15 +74,7 @@ void MidiMux::sustainOffEvent() {
   sustainedNotes.clear();
 }
 
-void MidiMux::channelPressureEvent(unsigned char pressure) {
-  lock_guard<mutex> guard(lock);
-
-  for (auto& kv: synths) {
-    kv.second->postPressureEvent(pressure);
-  }
-}
-
-void MidiMux::generate(uint32_t nSamples, float* buffer) {
+void GeneratorElement::generate(uint32_t nSamples, float* out, const float**) {
   lock_guard<mutex> guard(lock);
 
   auto dead = unordered_set<int>();
@@ -98,14 +84,7 @@ void MidiMux::generate(uint32_t nSamples, float* buffer) {
     if (synth->isExhausted()) {
       dead.insert(kv.first);
     } else {
-      synth->generate(nSamples, buffer);
-    }
-  }
-
-  for (uint32_t i = 0; i < nSamples; i++) {
-    for (uint32_t c = 0; c < channelCount; c++) {
-      int j = i * channelCount + c;
-      buffer[j] = filters[c].next(buffer[j]) * masterAmp;
+      synth->generate(nSamples, out);
     }
   }
 

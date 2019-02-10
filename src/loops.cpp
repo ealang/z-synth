@@ -1,7 +1,9 @@
 #include <alsa/asoundlib.h>
 
-#include "loops.h"
-#include "midi_mux.h"
+#include <memory>
+#include "./loops.h"
+
+using namespace std;
 
 typedef int16_t sample_t;
 unsigned int maxval = (1 << 15) - 1;
@@ -31,20 +33,21 @@ void encodeToBufferFmt(uint32_t count, float* from, sample_t* to) {
   }
 }
 
-int audioLoop(snd_pcm_t *const audioDevice, MidiMux *const mux, AudioParam *const audioParam) {
-  uint32_t samplesPerGen = audioParam->bufferSampleCount * audioParam->channelCount;
+int audioLoop(snd_pcm_t *const audioDevice, shared_ptr<MidiAudioElement<float>> pipeline, AudioParam audioParam) {
+  uint32_t samplesPerGen = audioParam.bufferSampleCount * audioParam.channelCount;
   auto samplesU = new sample_t[samplesPerGen];
-  auto samplesF = new float[samplesPerGen];
+  float* samplesF = new float[samplesPerGen];
+  const float* inSamplesF[] = { samplesF };
 
   sample_t* ptr;
   int err, cptr;
   while (1) {
     memset(samplesF, 0, sizeof(float) * samplesPerGen);
-    mux->generate(audioParam->bufferSampleCount, samplesF);
+    pipeline->generate(audioParam.bufferSampleCount, samplesF, inSamplesF);
     encodeToBufferFmt(samplesPerGen, samplesF, samplesU);
 
     ptr = samplesU;
-    cptr = audioParam->bufferSampleCount;
+    cptr = audioParam.bufferSampleCount;
     while (cptr > 0) {
       err = snd_pcm_writei(audioDevice, ptr, cptr);
       if (err == -EAGAIN)
@@ -65,7 +68,7 @@ int audioLoop(snd_pcm_t *const audioDevice, MidiMux *const mux, AudioParam *cons
   delete[] samplesF;
 }
 
-static void handleMidiEvent(MidiMux *const mux, snd_seq_t *const midiDevice) {
+static void handleMidiEvent(shared_ptr<MidiAudioElement<float>> pipeline, snd_seq_t *const midiDevice) {
   static const unsigned char listenChannel = 0;
   static const unsigned char sustainControlNumber = 64;
   snd_seq_event_t *ev;
@@ -80,29 +83,29 @@ static void handleMidiEvent(MidiMux *const mux, snd_seq_t *const midiDevice) {
       case SND_SEQ_EVENT_CONTROLLER: 
         if (ev->data.control.param == sustainControlNumber) {
           if (ev->data.control.value == 0) {
-            mux->sustainOffEvent();
+            pipeline->sustainOffEvent();
           } else {
-            mux->sustainOnEvent();
+            pipeline->sustainOnEvent();
           }
         }
         break;
       case SND_SEQ_EVENT_NOTEON:
       case SND_SEQ_EVENT_NOTEOFF: 
         if (ev->data.note.velocity == 0 || ev->type == SND_SEQ_EVENT_NOTEOFF) {
-          mux->noteOffEvent(ev->data.note.note);
+          pipeline->noteOffEvent(ev->data.note.note);
         } else {
-          mux->noteOnEvent(ev->data.note.note, ev->data.note.velocity);
+          pipeline->noteOnEvent(ev->data.note.note, ev->data.note.velocity);
         }
         break;        
       case SND_SEQ_EVENT_CHANPRESS:
-        mux->channelPressureEvent(ev->data.control.value);
+        pipeline->channelPressureEvent(ev->data.control.value);
         break;        
     }
     snd_seq_free_event(ev);
   } while (snd_seq_event_input_pending(midiDevice, 0) > 0);
 }
 
-int midiLoop(snd_seq_t *const midiDevice, MidiMux *const mux) {
+int midiLoop(snd_seq_t *const midiDevice, shared_ptr<MidiAudioElement<float>> pipeline) {
   int npfd;
   struct pollfd *pfd;
 
@@ -111,7 +114,7 @@ int midiLoop(snd_seq_t *const midiDevice, MidiMux *const mux) {
   snd_seq_poll_descriptors(midiDevice, pfd, npfd, POLLIN);
   while (1) {
     if (poll(pfd, npfd, 1000000) > 0) {
-      handleMidiEvent(mux, midiDevice);
+      handleMidiEvent(pipeline, midiDevice);
     }  
   }
 }

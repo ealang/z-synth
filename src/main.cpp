@@ -6,8 +6,8 @@
 
 #include <alsa/asoundlib.h>
 
-#include "midi_mux.h"
 #include "loops.h"
+#include "./elements/generator_element.h"
 
 using namespace std;
 
@@ -234,12 +234,12 @@ int main(int argc, char *argv[]) {
   }
 
   AudioParam audioParam { rate, (uint32_t)bufferSize, channelCount };
-  MidiMux midiMux(rate, channelCount);
+  shared_ptr<GeneratorElement> pipeline = make_shared<GeneratorElement>(rate, channelCount);
 
   snd_seq_t *midiDevice = openMidiDevice();
 
-  thread audioThread(audioLoop, audioDevice, &midiMux, &audioParam);
-  thread midiThread(midiLoop, midiDevice, &midiMux);
+  thread audioThread(audioLoop, audioDevice, pipeline, audioParam);
+  thread midiThread(midiLoop, midiDevice, pipeline);
 
   audioThread.join();
   midiThread.join();

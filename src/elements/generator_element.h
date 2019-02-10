@@ -1,5 +1,5 @@
-#ifndef NOTE_MUX_H
-#define NOTE_MUX_H
+#ifndef GENERATOR_ELEMENT_H
+#define GENERATOR_ELEMENT_H
 
 #include <cstdint> 
 #include <memory>
@@ -8,10 +8,10 @@
 #include <unordered_set>
 #include <vector>
 
-#include "note_synth.h"
-#include "filter.h"
+#include "../pipeline/pipeline_element.h"
+#include "./note_synth.h"
 
-class MidiMux {
+class GeneratorElement: public MidiAudioElement<float> {
   uint32_t sampleRateHz;
   uint32_t channelCount;
 
@@ -20,21 +20,20 @@ class MidiMux {
 
   std::unordered_map<unsigned char, int> noteSynths;
   std::unordered_map<uint32_t, std::shared_ptr<NoteSynth>> synths;
-  std::vector<Filter> filters;
 
   std::mutex lock;
   bool sustained=false;
   uint32_t nextId = 0;
 
 public:
-  MidiMux(uint32_t sampleRateHz, uint32_t channelCount);
+  GeneratorElement(uint32_t sampleRateHz, uint32_t channelCount);
 
   void noteOnEvent(unsigned char note, unsigned char vel);
   void noteOffEvent(unsigned char note);
   void sustainOnEvent();
   void sustainOffEvent();
-  void channelPressureEvent(unsigned char pressure);
-  void generate(uint32_t nSamples, float* buffer);
+
+  void generate(uint32_t nSamples, float* out, const float** in);
 };
 
 #endif

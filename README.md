@@ -4,11 +4,9 @@ A minimal synth that uses ALSA. The intention is to provide a synth that can ope
 
 Currently only a square wave and this project is in a hacky state.
 
-Build:
+Install dependencies: `apt install libasound2-dev`
 
-```
-make
-```
+Build: `make`
 
 Example usage:
 
