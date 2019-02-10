@@ -39,9 +39,7 @@ uint32_t FilterElement::nInputs() const {
 
 void FilterElement::generate(uint32_t nSamples, float* out, const float** inputs) {
   const float* input = inputs[0];
-  for (uint32_t i = 0; i < nSamples; i++) {
-    for (uint32_t c = 0; c < channelCount; c++) {
-      out[i * channelCount + c] = averagers[c]->next(input[i]);
-    }
+  for (uint32_t i = 0; i < nSamples * channelCount; i++) {
+    out[i] = averagers[i % channelCount]->next(input[i]);
   }
 }

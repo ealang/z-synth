@@ -8,7 +8,7 @@
 #include <alsa/asoundlib.h>
 
 #include "loops.h"
-#include "./elements/generator_element.h"
+#include "./pipeline_setup.h"
 
 using namespace std;
 
@@ -235,7 +235,7 @@ int main(int argc, char *argv[]) {
   }
 
   AudioParam audioParam { rate, (uint32_t)bufferSize, channelCount };
-  shared_ptr<GeneratorElement> pipeline = make_shared<GeneratorElement>(rate, channelCount);
+  shared_ptr<MidiAudioElement<float>> pipeline = build_pipeline(rate, bufferSize, channelCount);
 
   snd_seq_t *midiDevice = openMidiDevice();
 

@@ -69,6 +69,8 @@ void GeneratorElement::sustainOffEvent() {
 void GeneratorElement::generate(uint32_t nSamples, float* out, const float**) {
   auto dead = unordered_set<int>();
 
+  memset(out, 0, sizeof(float) * nSamples * channelCount);
+
   for (auto& kv: synths) {
     auto synth = kv.second;
     if (synth->isExhausted()) {

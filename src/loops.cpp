@@ -1,6 +1,3 @@
-#include <alsa/asoundlib.h>
-
-#include <memory>
 #include "./loops.h"
 
 using namespace std;
@@ -33,19 +30,17 @@ void encodeToBufferFmt(uint32_t count, float* from, sample_t* to) {
   }
 }
 
-int audioLoop(snd_pcm_t *const audioDevice, mutex& lock, shared_ptr<MidiAudioElement<float>> pipeline, AudioParam audioParam) {
+int audioLoop(snd_pcm_t *const audioDevice, mutex& lock, shared_ptr<AudioElement<float>> pipeline, AudioParam audioParam) {
   uint32_t samplesPerGen = audioParam.bufferSampleCount * audioParam.channelCount;
   auto samplesU = new sample_t[samplesPerGen];
   float* samplesF = new float[samplesPerGen];
-  const float* inSamplesF[] = { samplesF };
 
   sample_t* ptr;
   int err, cptr;
   while (1) {
-    memset(samplesF, 0, sizeof(float) * samplesPerGen);
     {
       lock_guard<mutex> guard(lock);
-      pipeline->generate(audioParam.bufferSampleCount, samplesF, inSamplesF);
+      pipeline->generate(audioParam.bufferSampleCount, samplesF);
     }
     encodeToBufferFmt(samplesPerGen, samplesF, samplesU);
 
@@ -71,7 +66,7 @@ int audioLoop(snd_pcm_t *const audioDevice, mutex& lock, shared_ptr<MidiAudioEle
   delete[] samplesF;
 }
 
-static void handleMidiEvent(shared_ptr<MidiAudioElement<float>>& pipeline, snd_seq_t *const midiDevice) {
+static void handleMidiEvent(shared_ptr<MidiListener>& pipeline, snd_seq_t *const midiDevice) {
   static const unsigned char listenChannel = 0;
   static const unsigned char sustainControlNumber = 64;
   snd_seq_event_t *ev;
@@ -108,7 +103,7 @@ static void handleMidiEvent(shared_ptr<MidiAudioElement<float>>& pipeline, snd_s
   } while (snd_seq_event_input_pending(midiDevice, 0) > 0);
 }
 
-int midiLoop(snd_seq_t *const midiDevice, mutex& lock, shared_ptr<MidiAudioElement<float>> pipeline) {
+int midiLoop(snd_seq_t *const midiDevice, mutex& lock, shared_ptr<MidiListener> pipeline) {
   int npfd;
   struct pollfd *pfd;
 
