@@ -2,8 +2,9 @@
 #define LOOPS_H
 
 #include <cstdint> 
-#include <alsa/asoundlib.h>
 #include <memory>
+#include <mutex>
+#include <alsa/asoundlib.h>
 #include "./pipeline/pipeline_element.h"
 
 class MidiMux;
@@ -14,7 +15,7 @@ struct AudioParam {
   const uint32_t channelCount;
 };
 
-int audioLoop(snd_pcm_t *const audioDevice, std::shared_ptr<MidiAudioElement<float>> pipeline, AudioParam audioParam);
-int midiLoop(snd_seq_t *const midiDevice, std::shared_ptr<MidiAudioElement<float>> pipeline);
+int audioLoop(snd_pcm_t *const audioDevice, std::mutex& lock, std::shared_ptr<MidiAudioElement<float>> pipeline, AudioParam audioParam);
+int midiLoop(snd_seq_t *const midiDevice, std::mutex& lock, std::shared_ptr<MidiAudioElement<float>> pipeline);
 
 #endif

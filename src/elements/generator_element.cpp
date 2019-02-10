@@ -17,8 +17,6 @@ GeneratorElement::GeneratorElement(
 }
 
 void GeneratorElement::noteOnEvent(unsigned char note, unsigned char vel) {
-  lock_guard<mutex> guard(lock);
-
   if (heldNotes.count(note) == 0) {
     int myId = nextId++;
     auto synth = make_shared<NoteSynth>(
@@ -41,8 +39,6 @@ void GeneratorElement::noteOnEvent(unsigned char note, unsigned char vel) {
 }
 
 void GeneratorElement::noteOffEvent(unsigned char note) {
-  lock_guard<mutex> guard(lock);
-
   if (heldNotes.count(note) > 0) {
     heldNotes.erase(note);
     if (!sustained) {
@@ -53,8 +49,6 @@ void GeneratorElement::noteOffEvent(unsigned char note) {
 }
 
 void GeneratorElement::sustainOnEvent() {
-  lock_guard<mutex> guard(lock);
-
   sustained = true;
   for (auto note: heldNotes) {
     sustainedNotes.insert(note);
@@ -62,8 +56,6 @@ void GeneratorElement::sustainOnEvent() {
 }
 
 void GeneratorElement::sustainOffEvent() {
-  lock_guard<mutex> guard(lock);
-
   sustained = false;
   for (auto note: sustainedNotes) {
     if (heldNotes.count(note) == 0) {
@@ -75,8 +67,6 @@ void GeneratorElement::sustainOffEvent() {
 }
 
 void GeneratorElement::generate(uint32_t nSamples, float* out, const float**) {
-  lock_guard<mutex> guard(lock);
-
   auto dead = unordered_set<int>();
 
   for (auto& kv: synths) {

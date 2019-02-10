@@ -3,7 +3,6 @@
 
 #include <cstdint> 
 #include <memory>
-#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -21,7 +20,6 @@ class GeneratorElement: public MidiAudioElement<float> {
   std::unordered_map<unsigned char, int> noteSynths;
   std::unordered_map<uint32_t, std::shared_ptr<NoteSynth>> synths;
 
-  std::mutex lock;
   bool sustained=false;
   uint32_t nextId = 0;
 

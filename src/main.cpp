@@ -1,3 +1,4 @@
+#include <mutex>
 #include <string>
 #include <stdio.h>
 #include <thread>
@@ -238,8 +239,9 @@ int main(int argc, char *argv[]) {
 
   snd_seq_t *midiDevice = openMidiDevice();
 
-  thread audioThread(audioLoop, audioDevice, pipeline, audioParam);
-  thread midiThread(midiLoop, midiDevice, pipeline);
+  mutex lock;
+  thread audioThread(audioLoop, audioDevice, ref(lock), pipeline, audioParam);
+  thread midiThread(midiLoop, midiDevice, ref(lock), pipeline);
 
   audioThread.join();
   midiThread.join();
