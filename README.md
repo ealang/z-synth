@@ -4,11 +4,19 @@ A minimal synth that uses ALSA. The intention is to provide a synth that can ope
 
 Currently only a square wave and this project is in a hacky state.
 
-Install dependencies: `apt install libasound2-dev`
+## Install ALSA dev dependencies
 
-Build: `make`
+```
+apt install libasound2-dev
+```
 
-Example usage:
+## Build
+
+```
+make
+```
+
+## Example usage
 
 ```
 # See audio output devices with `aplay -l`
@@ -16,4 +24,12 @@ Example usage:
 
 # See midi input devices with `aconnect -i`
 aconnect 16:0 z-synth:0
+```
+
+## Running tests
+
+Gtest is required. Follow the instructions [here](https://github.com/google/googletest/blob/master/googletest/README.md) to install it.
+
+```
+make z-synth-test && ./z-synth-test
 ```
