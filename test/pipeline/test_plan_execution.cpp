@@ -68,7 +68,7 @@ TEST(PlanExecutionTest, givenConnectionsWithALoop_ItThrowsException) {
   );
 }
 
-TEST(PlanExecutionTest, givenAPlan_ItCountsNumberOsequired) {
+TEST(PlanExecutionTest, givenAPlan_ItCountsNumberOfBuffersRequired) {
   auto connections = connections_t();
   connections["a"].insert("c");
   connections["b"].insert("c");
