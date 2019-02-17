@@ -1,3 +1,4 @@
+#include <cassert>
 #include <cstring>
 #include <math.h>
 #include <vector>
@@ -16,54 +17,84 @@ GeneratorElement::GeneratorElement(
 ): sampleRateHz(sampleRateHz), channelCount(channelCount) {
 }
 
+uint32_t GeneratorElement::createId() {
+  return nextId++;
+}
+
 void GeneratorElement::noteOnEvent(unsigned char note, unsigned char vel) {
-  if (heldNotes.count(note) == 0) {
-    int myId = nextId++;
-    auto synth = make_shared<NoteSynth>(
-        sampleRateHz,
-        channelCount,
-        midiNoteToFreq(note),
-        vel / 127.f
-    );
-    heldNotes.insert(note);
-    if (sustained) {
-      sustainedNotes.insert(note);
+  uint32_t myId = createId();
+  unsigned char adjustedVelocity = vel;
+  heldNotes.insert(note);
+
+  if (sustained) {
+    if (sustainSynths.count(note) > 0) {
+      synths[sustainSynths[note]]->postOffEvent();
+      adjustedVelocity = max(adjustedVelocity, sustainVelocity[note]);
     }
-    if (noteSynths.count(note) > 0) {
-      synths[noteSynths[note]]->postOffEvent();
-      noteSynths.erase(note);
+    sustainSynths[note] = myId;
+    sustainVelocity[note] = adjustedVelocity;
+  } else {
+    if (heldSynths.count(note) > 0) {
+      synths[heldSynths[note]]->postOffEvent(); // in case of multiple noteOn events
     }
-    noteSynths.emplace(make_pair(note, myId));
-    synths.emplace(make_pair(myId, synth));
+    heldSynths[note] = myId;
+    heldVelocity[note] = vel;
   }
+
+  synths.emplace(myId, make_shared<NoteSynth>(
+      sampleRateHz,
+      channelCount,
+      midiNoteToFreq(note),
+      adjustedVelocity / 127.f
+  ));
 }
 
 void GeneratorElement::noteOffEvent(unsigned char note) {
-  if (heldNotes.count(note) > 0) {
-    heldNotes.erase(note);
-    if (!sustained) {
-      synths[noteSynths[note]]->postOffEvent();
-      noteSynths.erase(note);
-    }
+  heldNotes.erase(note);
+  if (heldSynths.count(note) > 0) {
+    synths[heldSynths[note]]->postOffEvent();
+    heldSynths.erase(note);
+    heldVelocity.erase(note);
   }
 }
 
 void GeneratorElement::sustainOnEvent() {
-  sustained = true;
-  for (auto note: heldNotes) {
-    sustainedNotes.insert(note);
+  // in case of multiple sustainOn events
+  for (auto it: sustainSynths) {
+    synths[it.second]->postOffEvent();
   }
+
+  sustainSynths = heldSynths;
+  sustainVelocity = heldVelocity;
+  heldSynths.clear();
+  heldVelocity.clear();
+
+  sustained = true;
 }
 
 void GeneratorElement::sustainOffEvent() {
-  sustained = false;
-  for (auto note: sustainedNotes) {
+  auto synthIt = sustainSynths.begin();
+  auto velIt = sustainVelocity.begin();
+  while (synthIt != sustainSynths.end()) {
+    unsigned char note = synthIt->first;
+    uint32_t synth = synthIt->second;
+
+    // transfer any still held notes from sustain to held
     if (heldNotes.count(note) == 0) {
-      synths[noteSynths[note]]->postOffEvent();
-      noteSynths.erase(note);
+      synths[synth]->postOffEvent();
+    } else {
+      heldSynths.emplace(note, synth);
+      heldVelocity.emplace(note, velIt->second);
     }
+
+    synthIt++;
+    velIt++;
   }
-  sustainedNotes.clear();
+  assert(velIt == sustainVelocity.end());
+
+  sustainSynths.clear();
+  sustainVelocity.clear();
+  sustained = false;
 }
 
 uint32_t GeneratorElement::maxInputs() {

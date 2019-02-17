@@ -14,14 +14,18 @@ class GeneratorElement: public MidiAudioElement<float> {
   uint32_t sampleRateHz;
   uint32_t channelCount;
 
-  std::unordered_set<unsigned char> sustainedNotes;
-  std::unordered_set<unsigned char> heldNotes;
+  // Maintain a set of held and sustained data, and bounce
+  // notes back and forth based on the state of the pedal.
+  std::unordered_map<unsigned char, uint32_t> heldSynths;
+  std::unordered_map<unsigned char, uint32_t> sustainSynths;
+  std::unordered_map<unsigned char, unsigned char> heldVelocity;
+  std::unordered_map<unsigned char, unsigned char> sustainVelocity;
 
-  std::unordered_map<unsigned char, int> noteSynths;
   std::unordered_map<uint32_t, std::shared_ptr<NoteSynth>> synths;
-
-  bool sustained=false;
+  std::unordered_set<unsigned char> heldNotes;
+  bool sustained = false;
   uint32_t nextId = 0;
+  uint32_t createId();
 
 public:
   GeneratorElement(uint32_t sampleRateHz, uint32_t channelCount);
