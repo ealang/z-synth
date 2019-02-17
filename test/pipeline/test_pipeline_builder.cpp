@@ -61,7 +61,7 @@ TEST(PipelineBuilderTest, givenNoElements_ItThrowsAnException) {
 
 TEST(PipelineBuilderTest, givenASingleElement_ItBuildsAPipeline) {
   auto builder = PipelineBuilder<int>();
-  builder.registerElem("input", static_cast<shared_ptr<AudioElement<int>>>(make_shared<ConstElem>(42)));
+  builder.registerElem("input", make_shared<ConstElem>(42));
   builder.setOutputElem("input");
 
   ASSERT_EQ(runPipeline(builder), 42);
@@ -69,8 +69,8 @@ TEST(PipelineBuilderTest, givenASingleElement_ItBuildsAPipeline) {
 
 TEST(PipelineBuilderTest, givenALinearChain_ItBuildsAPipeline) {
   auto builder = PipelineBuilder<int>();
-  builder.registerElem("input", static_cast<shared_ptr<AudioElement<int>>>(make_shared<ConstElem>(42)));
-  builder.registerElem("add", static_cast<shared_ptr<AudioElement<int>>>(make_shared<SumElem>(1)));
+  builder.registerElem("input", make_shared<ConstElem>(42));
+  builder.registerElem("add", make_shared<SumElem>(1));
   builder.connectElems("input", "add");
   builder.setOutputElem("add");
 
@@ -81,19 +81,19 @@ TEST(PipelineBuilderTest, givenAFanInGraph_ItBuildsAPipeline) {
   auto builder = PipelineBuilder<int>();
   builder.registerElem(
     "input1",
-    static_cast<shared_ptr<AudioElement<int>>>(make_shared<ConstElem>(10))
+    make_shared<ConstElem>(10)
   );
   builder.registerElem(
     "input2",
-    static_cast<shared_ptr<AudioElement<int>>>(make_shared<ConstElem>(20))
+    make_shared<ConstElem>(20)
   );
   builder.registerElem(
     "add1",
-    static_cast<shared_ptr<AudioElement<int>>>(make_shared<SumElem>(1))
+    make_shared<SumElem>(1)
   );
   builder.registerElem(
     "add2",
-    static_cast<shared_ptr<AudioElement<int>>>(make_shared<SumElem>(40))
+    make_shared<SumElem>(40)
   );
   builder.connectElems("input1", "add1");
   builder.connectElems("input2", "add2");

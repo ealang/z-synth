@@ -14,6 +14,7 @@ shared_ptr<MidiAudioElement<float>> build_pipeline(uint32_t sampleRateHz, uint32
   shared_ptr<AudioElement<float>> filter = make_shared<FilterElement>(0.0002, sampleRateHz, channelCount);
   shared_ptr<AudioElement<float>> amp = make_shared<AmpElement>(0.04, channelCount);
 
+  builder.registerMidi(synth);
   builder.registerElem("synth", synth);
   builder.registerElem("filter", filter);
   builder.registerElem("amp", amp);

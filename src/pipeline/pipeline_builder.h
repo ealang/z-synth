@@ -10,12 +10,22 @@
 #include "./midi_listener.h"
 #include "./pipeline_element.h"
 
+/* Allow at-runtime construction of an audio pipeline. Elements can
+ * be added and connected together. Ultimately the pipeline is created
+ * by calling `build`.
+ */
 template <typename T>
 class PipelineBuilder {
   std::unordered_map<std::string, std::shared_ptr<AudioElement<T>>> audioElems;
   std::vector<std::shared_ptr<MidiListener>> midiElems;
   std::string outputElem;
   connections_t connections;
+
+  void reset() {
+    audioElems.clear();
+    midiElems.clear();
+    connections.clear();
+  }
 
 public:
   void registerElem(std::string name, std::shared_ptr<AudioElement<T>> elem) {
@@ -25,9 +35,8 @@ public:
     }
   }
 
-  void registerElem(std::string name, std::shared_ptr<MidiAudioElement<T>> elem) {
+  void registerMidi(std::shared_ptr<MidiListener> elem) {
     midiElems.push_back(elem);
-    registerElem(name, static_cast<std::shared_ptr<AudioElement<T>>>(elem));
   }
 
   void connectElems(std::string from, std::string to) {
@@ -39,7 +48,7 @@ public:
   }
 
   std::shared_ptr<MidiAudioElement<T>> build(uint32_t bufferSize, uint32_t channelCount) {
-    return std::make_shared<Pipeline<T>>(
+    auto pipeline = std::make_shared<Pipeline<T>>(
       bufferSize,
       channelCount,
       audioElems,
@@ -47,6 +56,8 @@ public:
       outputElem,
       connections
     );
+    reset();
+    return pipeline;
   }
 };
 
