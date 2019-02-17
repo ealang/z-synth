@@ -4,20 +4,20 @@
 #include <cstdint> 
 
 class NoteSynth {
-  uint32_t sampleRateHz;
-  uint32_t channelCount;
-  float freqHz;
-  float velocity;
+  const uint32_t sampleRateHz;
+  const uint32_t channelCount;
+  const float velocity;
 
   bool off = false;
   uint32_t sampleCount = 0;
   uint32_t offSample = 0;
-  uint32_t phase = 0;
 
-  uint32_t periodSize;
-  uint32_t attackSampleSize;
-  uint32_t releaseSampleSize;
-  uint32_t decaySampleSize;
+  float phase = 0;
+  const float periodSize;
+  const float stepSize;
+  const uint32_t attackSampleSize;
+  const uint32_t releaseSampleSize;
+  const uint32_t decaySampleSize;
 
 public:
   NoteSynth(

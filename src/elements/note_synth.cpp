@@ -9,7 +9,7 @@ using namespace std;
 static const float attackTimeMs = 10;
 static const float releaseTimeMs = 50;
 static const float decayTimeMs = 30;
-static const float sustainAmp = 0.8f;
+static const float sustainAmp = 0.5f;
 
 NoteSynth::NoteSynth(
     uint32_t sampleRateHz,
@@ -18,9 +18,9 @@ NoteSynth::NoteSynth(
     float velocity
 ): sampleRateHz(sampleRateHz),
    channelCount(channelCount),
-   freqHz(freqHz),
    velocity(velocity),
-   periodSize(sampleRateHz / freqHz),
+   periodSize(1.0 / freqHz),
+   stepSize(1.0 / sampleRateHz),
    attackSampleSize((attackTimeMs / 1000) * sampleRateHz),
    releaseSampleSize((releaseTimeMs / 1000) * sampleRateHz),
    decaySampleSize((decayTimeMs / 1000) * sampleRateHz) {
@@ -31,7 +31,7 @@ bool NoteSynth::isExhausted() {
 }
 
 void NoteSynth::generate(uint32_t nSamples, float* buffer) {
-  uint32_t halfPeriodSize = periodSize / 2;
+  float halfPeriodSize = periodSize / 2;
   for (uint32_t i = 0; i < nSamples; i++) {
     float amp;
     if (sampleCount < attackSampleSize) {
@@ -53,7 +53,7 @@ void NoteSynth::generate(uint32_t nSamples, float* buffer) {
       buffer[i * channelCount + c] += val;
     }
 
-    phase++;
+    phase += stepSize;
     sampleCount++;
     if (phase >= periodSize) {
       phase -= periodSize;
