@@ -78,3 +78,26 @@ TEST(PlanExecutionTest, givenAPlan_ItCountsNumberOfBuffersRequired) {
 
   ASSERT_EQ(countBuffersInPlan(plan), 3);
 };
+
+TEST(PlanExecutionTest, givenDisconnectedChainsOfElements_ItFindsTheTerminalNodes) {
+  connections_t connections = {
+    // chain
+    { "comp1_a", { "comp1_b" }},
+    // tree
+    { "comp2_a", { "comp2_b" }},
+    { "comp2_b", { "comp2_d" }},
+    { "comp2_c", { "comp2_b", "comp2_d" }},
+    // single node
+    { "comp3_a", {}},
+    // cycle
+    { "comp4_a", { "comp4_b" }},
+    { "comp4_b", { "comp4_a" }},
+  };
+  set<string> expected = {
+    "comp1_b",
+    "comp2_d",
+    "comp3_a",
+  };
+
+  ASSERT_EQ(findTerminalNodes(connections), expected);
+}

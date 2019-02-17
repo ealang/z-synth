@@ -20,11 +20,14 @@ class PipelineBuilder {
 public:
   void registerElem(std::string name, std::shared_ptr<AudioElement<T>> elem) {
     audioElems[name] = elem;
+    if (connections.count(name) == 0) {
+      connections.emplace(name, std::set<std::string>());
+    }
   }
 
   void registerElem(std::string name, std::shared_ptr<MidiAudioElement<T>> elem) {
-    audioElems[name] = elem;
     midiElems.push_back(elem);
+    registerElem(name, static_cast<std::shared_ptr<AudioElement<T>>>(elem));
   }
 
   void connectElems(std::string from, std::string to) {

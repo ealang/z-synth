@@ -161,3 +161,15 @@ uint32_t countBuffersInPlan(const plan_t& plan) {
   }
   return buffers.size();
 }
+
+set<string> findTerminalNodes(const connections_t& connections) {
+  set<string> terminals;
+
+  for (auto node: allNodes(connections)) {
+    auto outs = connections.find(node);
+    if (outs == connections.end() || outs->second.size() == 0) {
+      terminals.insert(node);
+    }
+  }
+  return terminals;
+}

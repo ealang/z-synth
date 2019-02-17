@@ -1,7 +1,7 @@
 #ifndef PIPELINE_H
 #define PIPELINE_H
 
-#include <stdio.h>
+#include <iostream>
 #include <sstream>
 #include <exception>
 #include <tuple>
@@ -42,6 +42,12 @@ class Pipeline: public MidiAudioElement<T> {
   ): midiElems(midiElems), bufferSize(bufferSize) {
     plan_t plan = planExecution(connections);
 
+    for (std::string elemName: findTerminalNodes(connections)) {
+      if (elemName != outputName) {
+        std::cerr << "Warning: Element \"" << elemName << "\" has no path to the output" << std::endl;
+      }
+    }
+
     uint32_t numBuffers = countBuffersInPlan(plan);
     buffer = std::vector<T>(numBuffers * bufferSize * channelCount);
 
@@ -53,6 +59,18 @@ class Pipeline: public MidiAudioElement<T> {
         outputStep = stepIndex;
       }
       uint32_t outputBuffer = std::get<2>(step);
+
+      uint32_t numInputs = inputBuffers.size();
+      uint32_t maxInputs = audioElems[name]->maxInputs();
+      if (numInputs > maxInputs) {
+        std::ostringstream str;
+        str << "Element \"" << outputName << "\" received " << numInputs << " input(s) but supports a max of " << maxInputs << std::endl;
+        throw std::runtime_error(str.str());
+      }
+
+      if (numInputs == 0 && maxInputs > 0) {
+        std::cerr << "Warning: Element \"" << name << "\" received no inputs" << std::endl;
+      }
 
       std::vector<const T*> ins;
       for (auto bufferNum: inputBuffers) {

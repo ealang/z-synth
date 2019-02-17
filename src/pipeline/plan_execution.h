@@ -40,4 +40,8 @@ plan_t planExecution(const connections_t& connections);
  */
 uint32_t countBuffersInPlan(const plan_t& plan);
 
+/* Identify nodes have no connections to other nodes.
+ */
+std::set<std::string> findTerminalNodes(const connections_t& connections);
+
 #endif
