@@ -42,6 +42,10 @@ class Pipeline: public MidiAudioElement<T> {
   ): midiElems(midiElems), bufferSize(bufferSize) {
     plan_t plan = planExecution(connections);
 
+    if (audioElems.size() == 0) {
+      throw std::runtime_error("No elements were provided");
+    }
+
     for (std::string elemName: allNodes(connections)) {
       if (audioElems.count(elemName) == 0) {
         std::ostringstream str;
