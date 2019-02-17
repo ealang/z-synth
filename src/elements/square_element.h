@@ -1,9 +1,13 @@
-#ifndef NOTE_SYNTH_H
-#define NOTE_SYNTH_H
+#ifndef SQUARE_ELEMENT_H
+#define SQUARE_ELEMENT_H
 
 #include <cstdint> 
+#include "../pipeline/pipeline_element.h"
 
-class NoteSynth {
+/* Additive square wave generator.
+ * Adds a square wave with a fixed frequency to an input signal.
+ */
+class SquareElement: public AudioElement<float> {
   const uint32_t sampleRateHz;
   const uint32_t channelCount;
   const float velocity;
@@ -20,15 +24,22 @@ class NoteSynth {
   const uint32_t decaySampleSize;
 
 public:
-  NoteSynth(
+  SquareElement(
     uint32_t sampleRateHz,
     uint32_t channelCount,
     float freqHz,
     float velocity
   );
 
+  uint32_t maxInputs() override;
+  void generate(
+    uint32_t numSamples,
+    float* out,
+    uint32_t numInputs,
+    inputs_t<float> inputs
+  ) override;
+
   bool isExhausted();
-  void generate(uint32_t nSamples, float* buffer);
   void postOffEvent();
   void postPressureEvent(float pressure);
 };

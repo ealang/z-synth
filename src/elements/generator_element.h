@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "../pipeline/pipeline_element.h"
-#include "./note_synth.h"
+#include "./square_element.h"
 
 class GeneratorElement: public MidiAudioElement<float> {
   uint32_t sampleRateHz;
@@ -21,7 +21,7 @@ class GeneratorElement: public MidiAudioElement<float> {
   std::unordered_map<unsigned char, unsigned char> heldVelocity;
   std::unordered_map<unsigned char, unsigned char> sustainVelocity;
 
-  std::unordered_map<uint32_t, std::shared_ptr<NoteSynth>> synths;
+  std::unordered_map<uint32_t, std::shared_ptr<SquareElement>> synths;
   std::unordered_set<unsigned char> heldNotes;
   bool sustained = false;
   uint32_t nextId = 0;

@@ -41,7 +41,7 @@ void GeneratorElement::noteOnEvent(unsigned char note, unsigned char vel) {
     heldVelocity[note] = vel;
   }
 
-  synths.emplace(myId, make_shared<NoteSynth>(
+  synths.emplace(myId, make_shared<SquareElement>(
       sampleRateHz,
       channelCount,
       midiNoteToFreq(note),
@@ -105,13 +105,15 @@ void GeneratorElement::generate(uint32_t numSamples, float* out, uint32_t, input
   auto dead = unordered_set<int>();
 
   memset(out, 0, sizeof(float) * numSamples * channelCount);
+  uint32_t numInputs = 1;
+  const float* inputs[1] = {out};
 
   for (auto& kv: synths) {
     auto synth = kv.second;
     if (synth->isExhausted()) {
       dead.insert(kv.first);
     } else {
-      synth->generate(numSamples, out);
+      synth->generate(numSamples, out, numInputs, inputs);
     }
   }
 
