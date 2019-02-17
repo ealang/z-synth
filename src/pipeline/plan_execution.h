@@ -30,6 +30,9 @@ public:
   InvalidConnections(std::string msg);
 };
 
+/* Return all nodes present in the connections. */
+std::set<std::string> allNodes(const connections_t& connections);
+
 /* Given the connections of audio elements, provide the order
  * in which the pipeline needs to be executed, along with named
  * buffers which should be provided as inputs to each element.

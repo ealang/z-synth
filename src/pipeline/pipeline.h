@@ -42,6 +42,14 @@ class Pipeline: public MidiAudioElement<T> {
   ): midiElems(midiElems), bufferSize(bufferSize) {
     plan_t plan = planExecution(connections);
 
+    for (std::string elemName: allNodes(connections)) {
+      if (audioElems.count(elemName) == 0) {
+        std::ostringstream str;
+        str << "Element \"" << elemName << "\" has not been registered";
+        throw std::runtime_error(str.str());
+      }
+    }
+
     for (std::string elemName: findTerminalNodes(connections)) {
       if (elemName != outputName) {
         std::cerr << "Warning: Element \"" << elemName << "\" has no path to the output" << std::endl;
@@ -64,7 +72,7 @@ class Pipeline: public MidiAudioElement<T> {
       uint32_t maxInputs = audioElems[name]->maxInputs();
       if (numInputs > maxInputs) {
         std::ostringstream str;
-        str << "Element \"" << outputName << "\" received " << numInputs << " input(s) but supports a max of " << maxInputs << std::endl;
+        str << "Element \"" << outputName << "\" received " << numInputs << " input(s) but supports a max of " << maxInputs;
         throw std::runtime_error(str.str());
       }
 
