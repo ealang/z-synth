@@ -1,16 +1,20 @@
+#include <cstring>
 #include "./amp_element.h"
 
 AmpElement::AmpElement(float amp, uint32_t channelCount):
   amp(amp), channelCount(channelCount) {
 }
 
-uint32_t AmpElement::nInputs() const {
-  return 1;
+uint32_t AmpElement::maxInputs() {
+  return -1;
 }
 
-void AmpElement::generate(uint32_t nSamples, float* out, const float** ins) {
-  const float *in = ins[0];
-  for (uint32_t i = 0; i < nSamples * channelCount; i++) {
-    out[i] = in[i] * amp;
+void AmpElement::generate(uint32_t numSamples, float* out, uint32_t numInputs, inputs_t<float> inputs) {
+  memset(out, 0, sizeof(float) * numSamples * channelCount);
+  for (uint32_t i = 0; i < numInputs; i++) {
+    const float *inBuffer = inputs[i];
+    for (uint32_t s = 0; s < numSamples * channelCount; s++) {
+      out[s] += inBuffer[s] * amp;
+    }
   }
 };

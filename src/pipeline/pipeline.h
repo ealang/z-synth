@@ -40,7 +40,6 @@ class Pipeline: public MidiAudioElement<T> {
     std::string outputName,
     connections_t connections
   ): midiElems(midiElems), bufferSize(bufferSize) {
-
     plan_t plan = planExecution(connections);
 
     uint32_t numBuffers = countBuffersInPlan(plan);
@@ -54,17 +53,6 @@ class Pipeline: public MidiAudioElement<T> {
         outputStep = stepIndex;
       }
       uint32_t outputBuffer = std::get<2>(step);
-
-      uint32_t numInputs = inputBuffers.size();
-      if (numInputs != audioElems[name]->nInputs()) {
-        fprintf(
-          stderr,
-          "Warning: element \"%s\" recieved %d connections but expected %d\n",
-          name.c_str(),
-          numInputs,
-          audioElems[name]->nInputs()
-        );
-      }
 
       std::vector<const T*> ins;
       for (auto bufferNum: inputBuffers) {
@@ -88,23 +76,25 @@ class Pipeline: public MidiAudioElement<T> {
     }
   }
 
+  uint32_t maxInputs() override {
+    return 0;
+  }
+
   void generate(
-    uint32_t nSamples,
+    uint32_t numSamples,
     T* out,
-    const T** in = nullptr
-  ) {
-    if (nSamples > bufferSize) {
+    uint32_t,
+    inputs_t<T>
+  ) override {
+    if (numSamples > bufferSize) {
       throw std::runtime_error("Asked for too many samples");
-    }
-    if (in != nullptr) {
-      throw std::runtime_error("Pipeline was given an audio input");
     }
 
     // set user's output buffer as final output and run stages
     steps[outputStep].out = out;
     for (const auto& step: steps) {
-      const T** ins = const_cast<const T**>(step.in.data());
-      step.elem->generate(nSamples, step.out, ins);
+      inputs_t<T> ins = step.in.data();
+      step.elem->generate(numSamples, step.out, step.in.size(), ins);
     } 
   }
 

@@ -31,7 +31,8 @@ public:
   void sustainOnEvent();
   void sustainOffEvent();
 
-  void generate(uint32_t nSamples, float* out, const float** in);
+  uint32_t maxInputs() override;
+  void generate(uint32_t numSamples, float* out, uint32_t, inputs_t<float>) override;
 };
 
 #endif

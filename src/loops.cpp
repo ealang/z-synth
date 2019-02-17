@@ -40,7 +40,7 @@ int audioLoop(snd_pcm_t *const audioDevice, mutex& lock, shared_ptr<AudioElement
   while (1) {
     {
       lock_guard<mutex> guard(lock);
-      pipeline->generate(audioParam.bufferSampleCount, samplesF);
+      pipeline->generate(audioParam.bufferSampleCount, samplesF, 0, nullptr);
     }
     encodeToBufferFmt(samplesPerGen, samplesF, samplesU);
 

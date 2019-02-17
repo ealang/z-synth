@@ -14,8 +14,8 @@ class FilterElement: public AudioElement<float> {
 
 public:
   FilterElement(float timeSec, uint32_t sampleRateHz, uint32_t channelCount);
-  uint32_t nInputs() const;
-  void generate(uint32_t nSamples, float* out, const float** in);
+  uint32_t maxInputs() override;
+  void generate(uint32_t numSamples, float* out, uint32_t numInputs, inputs_t<float> inputs) override;
 };
 
 #endif

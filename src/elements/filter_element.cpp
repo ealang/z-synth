@@ -33,13 +33,15 @@ FilterElement::FilterElement(float timeSec, uint32_t sampleRateHz, uint32_t chan
     }
 }
 
-uint32_t FilterElement::nInputs() const {
+uint32_t FilterElement::maxInputs() {
   return 1;
 }
 
-void FilterElement::generate(uint32_t nSamples, float* out, const float** inputs) {
-  const float* input = inputs[0];
-  for (uint32_t i = 0; i < nSamples * channelCount; i++) {
-    out[i] = averagers[i % channelCount]->next(input[i]);
+void FilterElement::generate(uint32_t numSamples, float* out, uint32_t numInputs, inputs_t<float> inputs) {
+  if (numInputs > 0) {
+    const float* input = inputs[0];
+    for (uint32_t i = 0; i < numSamples * channelCount; i++) {
+      out[i] = averagers[i % channelCount]->next(input[i]);
+    }
   }
 }

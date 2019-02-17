@@ -66,17 +66,21 @@ void GeneratorElement::sustainOffEvent() {
   sustainedNotes.clear();
 }
 
-void GeneratorElement::generate(uint32_t nSamples, float* out, const float**) {
+uint32_t GeneratorElement::maxInputs() {
+  return 0;
+}
+
+void GeneratorElement::generate(uint32_t numSamples, float* out, uint32_t, inputs_t<float>) {
   auto dead = unordered_set<int>();
 
-  memset(out, 0, sizeof(float) * nSamples * channelCount);
+  memset(out, 0, sizeof(float) * numSamples * channelCount);
 
   for (auto& kv: synths) {
     auto synth = kv.second;
     if (synth->isExhausted()) {
       dead.insert(kv.first);
     } else {
-      synth->generate(nSamples, out);
+      synth->generate(numSamples, out);
     }
   }
 

@@ -11,8 +11,8 @@ class AmpElement: public AudioElement<float> {
   uint32_t channelCount;
 public:
   AmpElement(float amp, uint32_t channelCount);
-  uint32_t nInputs() const;
-  void generate(uint32_t nSamples, float* out, const float** ins);
+  uint32_t maxInputs() override;
+  void generate(uint32_t numSamples, float* out, uint32_t numInputs, inputs_t<float> inputs) override;
 };
 
 #endif

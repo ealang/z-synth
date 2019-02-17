@@ -5,13 +5,17 @@
 #include "./midi_listener.h"
 
 template <typename T>
+using inputs_t = const T* const *;
+
+template <typename T>
 class AudioElement {
 public:
-  virtual uint32_t nInputs() const { return 0; }
+  virtual uint32_t maxInputs() = 0;
   virtual void generate(
-    uint32_t,
+    uint32_t numSamples,
     T* out,
-    const T** in = nullptr
+    uint32_t numInputs,
+    inputs_t<T> inputs
   ) = 0;
 };
 
