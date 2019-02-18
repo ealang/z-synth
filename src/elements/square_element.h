@@ -4,13 +4,10 @@
 #include <cstdint> 
 #include "../pipeline/pipeline_element.h"
 
-/* Additive square wave generator.
- * Adds a square wave with a fixed frequency to an input signal.
- */
 class SquareElement: public AudioElement<float> {
   const uint32_t sampleRateHz;
   const uint32_t channelCount;
-  const float velocity;
+  const float maxAmp;
 
   bool off = false;
   uint32_t sampleCount = 0;
@@ -28,7 +25,7 @@ public:
     uint32_t sampleRateHz,
     uint32_t channelCount,
     float freqHz,
-    float velocity
+    float maxAmp
   );
 
   uint32_t maxInputs() override;
@@ -41,7 +38,6 @@ public:
 
   bool isExhausted();
   void postOffEvent();
-  void postPressureEvent(float pressure);
 };
 
 #endif

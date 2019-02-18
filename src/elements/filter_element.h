@@ -13,7 +13,7 @@ class FilterElement: public AudioElement<float> {
   std::vector<std::shared_ptr<RollingAverage>> averagers;
 
 public:
-  FilterElement(float timeSec, uint32_t sampleRateHz, uint32_t channelCount);
+  FilterElement(uint32_t length, uint32_t channelCount);
   uint32_t maxInputs() override;
   void generate(uint32_t numSamples, float* out, uint32_t numInputs, inputs_t<float> inputs) override;
 };

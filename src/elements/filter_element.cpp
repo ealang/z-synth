@@ -18,6 +18,9 @@ public:
     buffer(length) {}
 
   float next(float val) {
+    if (length == 0) {
+      return val;
+    }
     sum = (sum + val - buffer[bufferPos]) * pullDown;
     buffer[bufferPos] = val;
     bufferPos = (bufferPos + 1) % length;
@@ -25,9 +28,8 @@ public:
   }
 };
 
-FilterElement::FilterElement(float timeSec, uint32_t sampleRateHz, uint32_t channelCount)
+FilterElement::FilterElement(uint32_t length, uint32_t channelCount)
   : channelCount(channelCount) {
-    uint32_t length = max((uint32_t)1, static_cast<uint32_t>(timeSec * sampleRateHz));
     for (uint32_t c = 0; c < channelCount; ++c) {
       averagers.push_back(make_shared<RollingAverage>(length));
     }

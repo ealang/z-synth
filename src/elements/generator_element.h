@@ -4,18 +4,23 @@
 #include <cstdint> 
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 #include "../pipeline/pipeline_element.h"
 #include "../synth_utils/sustain_adapter.h"
 
-class SquareElement;
+class NotePipeline;
 
+/* Midi aware element that can play multiple notes simultaneously using
+ * internal per-note pipelines. Yo dawg, I heard you like pipelines...
+ */
 class GeneratorElement: public SustainAdapter, public AudioElement<float> {
   uint32_t sampleRateHz;
   uint32_t channelCount;
 
   std::unordered_map<unsigned char, uint32_t> noteSynths;
-  std::unordered_map<uint32_t, std::shared_ptr<SquareElement>> synths;
+  std::unordered_map<uint32_t, std::shared_ptr<NotePipeline>> pipelines;
+  std::vector<float> stagingBuffer;
 
   uint32_t _nextId = 0;
   uint32_t createId();

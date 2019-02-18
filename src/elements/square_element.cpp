@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <cassert>
 #include <stdio.h>
 #include <math.h>
 
@@ -8,18 +7,18 @@
 using namespace std;
 
 static const float attackTimeMs = 10;
-static const float releaseTimeMs = 50;
+static const float releaseTimeMs = 100;
 static const float decayTimeMs = 30;
-static const float sustainAmp = 0.5f;
+static const float sustainAmp = 0.5;
 
 SquareElement::SquareElement(
     uint32_t sampleRateHz,
     uint32_t channelCount,
     float freqHz,
-    float velocity
+    float maxAmp
 ): sampleRateHz(sampleRateHz),
   channelCount(channelCount),
-  velocity(velocity),
+  maxAmp(maxAmp),
   periodSize(1.0 / freqHz),
   stepSize(1.0 / sampleRateHz),
   attackSampleSize((attackTimeMs / 1000) * sampleRateHz),
@@ -32,17 +31,15 @@ bool SquareElement::isExhausted() {
 }
 
 uint32_t SquareElement::maxInputs() {
-  return 1;
+  return 0;
 }
 
 void SquareElement::generate(
   uint32_t numSamples,
   float* out,
-  uint32_t numInputs,
-  inputs_t<float> inputs
+  uint32_t,
+  inputs_t<float>
 ) {
-  assert(numInputs == 1);
-  const float* input = inputs[0];
   float halfPeriodSize = periodSize / 2;
   for (uint32_t i = 0; i < numSamples; i++) {
     float amp;
@@ -60,10 +57,9 @@ void SquareElement::generate(
       amp = sustainAmp;
     }
 
-    float val = (phase > halfPeriodSize ? 1 : -1) * amp * velocity;
+    float val = (phase > halfPeriodSize ? 1 : -1) * amp * maxAmp;
     for (uint32_t c = 0; c < channelCount; c++) {
-      uint32_t s = i * channelCount + c;
-      out[s] = input[s] + val;
+      out[i * channelCount + c] = val;
     }
 
     phase += stepSize;
@@ -77,7 +73,4 @@ void SquareElement::generate(
 void SquareElement::postOffEvent() {
   offSample = sampleCount;
   off = true;
-}
-
-void SquareElement::postPressureEvent(float) {
 }
