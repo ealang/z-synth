@@ -4,7 +4,8 @@
 #include <stdio.h>
 #include <thread>
 #include <errno.h>
-#include <getopt.h>
+
+#include "./cli.h"
 
 #include <alsa/asoundlib.h>
 
@@ -13,16 +14,7 @@
 
 using namespace std;
 
-const static string midiDeviceName = "z-synth";
-static string device = "hw:0,0";
-static uint32_t rate = 44100;
-static uint32_t bufferTimeMs = 10;
-static uint32_t periodTimeMs = 5;
-static uint32_t channelCount = 2;
-static snd_pcm_sframes_t bufferSize;
-static snd_pcm_sframes_t periodSize;
-
-snd_seq_t *openMidiDevice() {
+snd_seq_t *openMidiDevice(const CLIParams& params) {
   snd_seq_t *midiDevice;
   int portid;
 
@@ -30,8 +22,8 @@ snd_seq_t *openMidiDevice() {
     fprintf(stderr, "Error opening ALSA sequencer.\n");
     exit(1);
   }
-  snd_seq_set_client_name(midiDevice, midiDeviceName.c_str());
-  if ((portid = snd_seq_create_simple_port(midiDevice, midiDeviceName.c_str(),
+  snd_seq_set_client_name(midiDevice, params.midiDeviceName.c_str());
+  if ((portid = snd_seq_create_simple_port(midiDevice, params.midiDeviceName.c_str(),
           SND_SEQ_PORT_CAP_WRITE|SND_SEQ_PORT_CAP_SUBS_WRITE,
           SND_SEQ_PORT_TYPE_APPLICATION)) < 0) {
     fprintf(stderr, "Error creating sequencer port.\n");
@@ -40,21 +32,8 @@ snd_seq_t *openMidiDevice() {
   return midiDevice;
 }
 
-static void help(void) {
-  printf(
-    "Usage: midisynth [OPTION]... [FILE]...\n"
-    "-h,--help      help\n"
-    "-D,--device    playback device (default: %s)\n"
-    "-r,--rate      stream rate in Hz (default: %d)\n"
-    "-b,--buffer    buffer size in ms (default: %d)\n"
-    "-p,--period    period size in ms (default: %d)\n"
-    "-c,--channels  number of channels (default: %d)\n"
-    "\n"
-    , device.c_str(), rate, bufferTimeMs, periodTimeMs, channelCount
-  );
-}
-
 static int setHwParams(
+  CLIParams& cliParams,
   snd_pcm_t *audioDevice,
   snd_pcm_hw_params_t *params,
   snd_pcm_access_t access
@@ -88,24 +67,24 @@ static int setHwParams(
     return err;
   }
   /* set the count of channels */
-  err = snd_pcm_hw_params_set_channels(audioDevice, params, channelCount);
+  err = snd_pcm_hw_params_set_channels(audioDevice, params, cliParams.channelCount);
   if (err < 0) {
-    printf("Channels count (%i) not available for playbacks: %s\n", channelCount, snd_strerror(err));
+    printf("Channels count (%i) not available for playbacks: %s\n", cliParams.channelCount, snd_strerror(err));
     return err;
   }
   /* set the stream rate */
-  rrate = rate;
+  rrate = cliParams.rate;
   err = snd_pcm_hw_params_set_rate_near(audioDevice, params, &rrate, 0);
   if (err < 0) {
-    printf("Rate %iHz not available for playback: %s\n", rate, snd_strerror(err));
+    printf("Rate %iHz not available for playback: %s\n", cliParams.rate, snd_strerror(err));
     return err;
   }
-  if (rrate != rate) {
-    printf("Rate doesn't match (requested %iHz, got %iHz)\n", rate, err);
+  if (rrate != cliParams.rate) {
+    printf("Rate doesn't match (requested %iHz, got %iHz)\n", cliParams.rate, err);
     return -EINVAL;
   }
   /* set the buffer time */
-  unsigned int bufferTimeUs = bufferTimeMs * 1000;
+  unsigned int bufferTimeUs = cliParams.bufferTimeMs * 1000;
   err = snd_pcm_hw_params_set_buffer_time_near(audioDevice, params, &bufferTimeUs, &dir);
   if (err < 0) {
     printf("Unable to set buffer time %i for playback: %s\n", bufferTimeUs, snd_strerror(err));
@@ -116,9 +95,9 @@ static int setHwParams(
     printf("Unable to get buffer size for playback: %s\n", snd_strerror(err));
     return err;
   }
-  bufferSize = size;
+  cliParams.bufferSize = size;
   /* set the period time */
-  unsigned int periodTimeUs = periodTimeMs * 1000;
+  unsigned int periodTimeUs = cliParams.periodTimeMs * 1000;
   err = snd_pcm_hw_params_set_period_time_near(audioDevice, params, &periodTimeUs, &dir);
   if (err < 0) {
     printf("Unable to set period time %i for playback: %s\n", periodTimeUs, snd_strerror(err));
@@ -129,9 +108,9 @@ static int setHwParams(
     printf("Unable to get period size for playback: %s\n", snd_strerror(err));
     return err;
   }
-  periodSize = size;
+  cliParams.periodSize = size;
 
-  printf("Buffer size: %d samples\nPeriod size %d samples\n", (int)bufferSize, (int)periodSize);
+  printf("Buffer size: %d samples\nPeriod size %d samples\n", (int)cliParams.bufferSize, (int)cliParams.periodSize);
   /* write the parameters to device */
   err = snd_pcm_hw_params(audioDevice, params);
   if (err < 0) {
@@ -141,7 +120,7 @@ static int setHwParams(
   return 0;
 }
 
-static int setSwParams(snd_pcm_t *audioDevice, snd_pcm_sw_params_t *swparams) {
+static int setSwParams(const CLIParams& cliParams, snd_pcm_t *audioDevice, snd_pcm_sw_params_t *swparams) {
   int err;
   /* get the current swparams */
   err = snd_pcm_sw_params_current(audioDevice, swparams);
@@ -151,14 +130,14 @@ static int setSwParams(snd_pcm_t *audioDevice, snd_pcm_sw_params_t *swparams) {
   }
   /* start the transfer when the buffer is almost full: */
   /* (buffer_size / avail_min) * avail_min */
-  err = snd_pcm_sw_params_set_start_threshold(audioDevice, swparams, (bufferSize / periodSize) * periodSize);
+  err = snd_pcm_sw_params_set_start_threshold(audioDevice, swparams, (cliParams.bufferSize / cliParams.periodSize) * cliParams.periodSize);
   if (err < 0) {
     printf("Unable to set start threshold mode for playback: %s\n", snd_strerror(err));
     return err;
   }
   /* allow the transfer when at least periodSize samples can be processed */
   /* or disable this mechanism when period event is enabled (aka interrupt like style processing) */
-  err = snd_pcm_sw_params_set_avail_min(audioDevice, swparams, periodSize);
+  err = snd_pcm_sw_params_set_avail_min(audioDevice, swparams, cliParams.periodSize);
   if (err < 0) {
     printf("Unable to set avail min for playback: %s\n", snd_strerror(err));
     return err;
@@ -179,19 +158,19 @@ void encodeToBufferFmt(uint32_t count, float* from, sample_t* to) {
   }
 }
 
-void loop(snd_pcm_t* audioDevice, snd_seq_t* midiDevice) {
+void loop(const CLIParams& params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice) {
   mutex lock;
-  shared_ptr<MidiAudioElement<float>> pipeline = build_pipeline(rate, periodSize, channelCount);
+  shared_ptr<MidiAudioElement<float>> pipeline = build_pipeline(params.rate, params.periodSize, params.channelCount);
 
-  vector<float> audioBuffer(channelCount * periodSize);
+  vector<float> audioBuffer(params.channelCount * params.periodSize);
 
-  AudioParam audioParam { rate, (uint32_t)periodSize, channelCount };
+  AudioParam audioParam { params.rate, (uint32_t)params.periodSize, params.channelCount };
   thread audioThread(audioLoop, audioDevice, audioParam, [&](sample_t* buffer) {
     {
       lock_guard<mutex> guard(lock);
-      pipeline->generate(periodSize, audioBuffer.data(), 0, nullptr);
+      pipeline->generate(params.periodSize, audioBuffer.data(), 0, nullptr);
     }
-    encodeToBufferFmt(periodSize * channelCount, audioBuffer.data(), buffer);
+    encodeToBufferFmt(params.periodSize * params.channelCount, audioBuffer.data(), buffer);
   });
 
   thread midiThread(midiLoop, midiDevice, [&](const snd_seq_event_t* ev) {
@@ -232,71 +211,31 @@ void loop(snd_pcm_t* audioDevice, snd_seq_t* midiDevice) {
 }
 
 int main(int argc, char *argv[]) {
-  struct option long_option[] =
-  {
-    {"help", 0, NULL, 'h'},
-    {"device", 1, NULL, 'D'},
-    {"rate", 1, NULL, 'r'},
-    {"buffer", 1, NULL, 'b'},
-    {"period", 1, NULL, 'p'},
-    {"channels", 1, NULL, 'c'},
-    {NULL, 0, NULL, 0},
-  };
+  CLIParams params = parseArgs(argc, argv);
+
+  snd_seq_t *midiDevice = openMidiDevice(params);
   snd_pcm_t *audioDevice;
-  int err, morehelp;
   snd_pcm_hw_params_t *hwparams;
   snd_pcm_sw_params_t *swparams;
   snd_pcm_hw_params_alloca(&hwparams);
   snd_pcm_sw_params_alloca(&swparams);
-  morehelp = 0;
-  while (1) {
-    int c;
-    if ((c = getopt_long(argc, argv, "hD:r:c:f:b:p:m:o:vne", long_option, NULL)) < 0)
-      break;
-    switch (c) {
-      case 'h':
-        morehelp++;
-        break;
-      case 'D':
-        device = strdup(optarg);
-        break;
-      case 'r':
-        rate = atoi(optarg);
-        rate = rate < 4000 ? 4000 : rate;
-        rate = rate > 196000 ? 196000 : rate;
-        break;
-      case 'b':
-        bufferTimeMs = atoi(optarg);
-        break;
-      case 'p':
-        periodTimeMs = atoi(optarg);
-        break;
-      case 'c':
-        channelCount = atoi(optarg);
-    }
-  }
-  if (morehelp) {
-    help();
-    return 0;
-  }
 
-  if ((err = snd_pcm_open(&audioDevice, device.c_str(), SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
+  int err;
+  if ((err = snd_pcm_open(&audioDevice, params.device.c_str(), SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
     printf("Playback open error: %s\n", snd_strerror(err));
     return 0;
   }
 
-  if ((err = setHwParams(audioDevice, hwparams, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
+  if ((err = setHwParams(params, audioDevice, hwparams, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
     printf("Setting of hwparams failed: %s\n", snd_strerror(err));
     exit(EXIT_FAILURE);
   }
-  if ((err = setSwParams(audioDevice, swparams)) < 0) {
+  if ((err = setSwParams(params, audioDevice, swparams)) < 0) {
     printf("Setting of swparams failed: %s\n", snd_strerror(err));
     exit(EXIT_FAILURE);
   }
 
-  snd_seq_t *midiDevice = openMidiDevice();
-
-  loop(audioDevice, midiDevice);
+  loop(params, audioDevice, midiDevice);
 
   snd_pcm_close(audioDevice);
   return 0;
