@@ -1,9 +1,10 @@
 #include <mutex>
 #include <thread>
 
-#include "./alsa.h"
+#include "./alsa/alsa.h"
+#include "./alsa/loops.h"
+
 #include "./cli.h"
-#include "./loops.h"
 #include "./pipeline_setup.h"
 
 using namespace std;
