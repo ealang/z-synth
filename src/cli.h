@@ -12,8 +12,6 @@ struct CLIParams {
   uint32_t bufferTimeMs = 10;
   uint32_t periodTimeMs = 5;
   uint32_t channelCount = 2;
-  snd_pcm_sframes_t bufferSize;
-  snd_pcm_sframes_t periodSize;
 };
 
 CLIParams parseArgs(int argc, char *argv[]);
