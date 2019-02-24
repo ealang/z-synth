@@ -2,9 +2,6 @@
 
 using namespace std;
 
-typedef int16_t sample_t;
-unsigned int maxval = (1 << 15) - 1;
-
 static int xrunRecovery(snd_pcm_t *const audioDevice, int err) {
   if (err == -EPIPE) {    /* under-run */
     err = snd_pcm_prepare(audioDevice);
@@ -24,32 +21,24 @@ static int xrunRecovery(snd_pcm_t *const audioDevice, int err) {
   return err;
 }
 
-void encodeToBufferFmt(uint32_t count, float* from, sample_t* to) {
-  for (uint32_t i = 0; i < count; i++) {
-    to[i] = static_cast<sample_t>(from[i] * maxval);
-  }
-}
+int audioLoop(
+  snd_pcm_t* audioDevice,
+  AudioParam audioParam,
+  std::function<void(sample_t*)> onSample
+) {
+  uint32_t totalSamples = audioParam.bufferSampleCount * audioParam.channelCount;
+  sample_t* samples = new sample_t[totalSamples];
 
-int audioLoop(snd_pcm_t *const audioDevice, mutex& lock, shared_ptr<AudioElement<float>> pipeline, AudioParam audioParam) {
-  uint32_t samplesPerGen = audioParam.bufferSampleCount * audioParam.channelCount;
-  auto samplesU = new sample_t[samplesPerGen];
-  float* samplesF = new float[samplesPerGen];
-
-  sample_t* ptr;
-  int err, cptr;
   while (1) {
-    {
-      lock_guard<mutex> guard(lock);
-      pipeline->generate(audioParam.bufferSampleCount, samplesF, 0, nullptr);
-    }
-    encodeToBufferFmt(samplesPerGen, samplesF, samplesU);
+    onSample(samples);
 
-    ptr = samplesU;
-    cptr = audioParam.bufferSampleCount;
-    while (cptr > 0) {
-      err = snd_pcm_writei(audioDevice, ptr, cptr);
-      if (err == -EAGAIN)
+    sample_t* ptr = samples;
+    int remaining = audioParam.bufferSampleCount;
+    while (remaining > 0) {
+      int err = snd_pcm_writei(audioDevice, ptr, remaining);
+      if (err == -EAGAIN) {
         continue;
+      }
       if (err < 0) {
         if (xrunRecovery(audioDevice, err) < 0) {
           printf("Write error: %s\n", snd_strerror(err));
@@ -58,62 +47,25 @@ int audioLoop(snd_pcm_t *const audioDevice, mutex& lock, shared_ptr<AudioElement
         break;  /* skip one period */
       }
       ptr += err;
-      cptr -= err;
+      remaining -= err;
     }
   }
 
-  delete[] samplesU;
-  delete[] samplesF;
+  delete[] samples;
 }
 
-static void handleMidiEvent(shared_ptr<MidiListener>& pipeline, snd_seq_t *const midiDevice) {
-  static const unsigned char listenChannel = 0;
-  static const unsigned char sustainControlNumber = 64;
-  snd_seq_event_t *ev;
-
-  do {
-    snd_seq_event_input(midiDevice, &ev);
-    if (ev->data.control.channel != listenChannel) {
-      continue;
-    }
-
-    switch (ev->type) {
-      case SND_SEQ_EVENT_CONTROLLER: 
-        if (ev->data.control.param == sustainControlNumber) {
-          if (ev->data.control.value == 0) {
-            pipeline->sustainOffEvent();
-          } else {
-            pipeline->sustainOnEvent();
-          }
-        }
-        break;
-      case SND_SEQ_EVENT_NOTEON:
-      case SND_SEQ_EVENT_NOTEOFF: 
-        if (ev->data.note.velocity == 0 || ev->type == SND_SEQ_EVENT_NOTEOFF) {
-          pipeline->noteOffEvent(ev->data.note.note);
-        } else {
-          pipeline->noteOnEvent(ev->data.note.note, ev->data.note.velocity);
-        }
-        break;        
-      case SND_SEQ_EVENT_CHANPRESS:
-        pipeline->channelPressureEvent(ev->data.control.value);
-        break;        
-    }
-    snd_seq_free_event(ev);
-  } while (snd_seq_event_input_pending(midiDevice, 0) > 0);
-}
-
-int midiLoop(snd_seq_t *const midiDevice, mutex& lock, shared_ptr<MidiListener> pipeline) {
-  int npfd;
-  struct pollfd *pfd;
-
-  npfd = snd_seq_poll_descriptors_count(midiDevice, POLLIN);
-  pfd = (struct pollfd *)alloca(npfd * sizeof(struct pollfd));
+int midiLoop(snd_seq_t *const midiDevice, function<void(const snd_seq_event_t*)> onEvent) {
+  int npfd = snd_seq_poll_descriptors_count(midiDevice, POLLIN);
+  pollfd* pfd = (struct pollfd *)alloca(npfd * sizeof(struct pollfd));
   snd_seq_poll_descriptors(midiDevice, pfd, npfd, POLLIN);
   while (1) {
     if (poll(pfd, npfd, 1000000) > 0) {
-      lock_guard<mutex> guard(lock);
-      handleMidiEvent(pipeline, midiDevice);
+      snd_seq_event_t *ev;
+      do {
+        snd_seq_event_input(midiDevice, &ev);
+        onEvent(ev);
+        snd_seq_free_event(ev);
+      } while (snd_seq_event_input_pending(midiDevice, 0) > 0);
     }  
   }
 }

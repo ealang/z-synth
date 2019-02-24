@@ -1,4 +1,5 @@
 #include <mutex>
+#include <vector>
 #include <string>
 #include <stdio.h>
 #include <thread>
@@ -171,6 +172,65 @@ static int setSwParams(snd_pcm_t *audioDevice, snd_pcm_sw_params_t *swparams) {
   return 0;
 }
 
+void encodeToBufferFmt(uint32_t count, float* from, sample_t* to) {
+  static const int maxval = (1 << 15) - 1;
+  for (uint32_t i = 0; i < count; i++) {
+    to[i] = static_cast<sample_t>(from[i] * maxval);
+  }
+}
+
+void loop(snd_pcm_t* audioDevice, snd_seq_t* midiDevice) {
+  mutex lock;
+  shared_ptr<MidiAudioElement<float>> pipeline = build_pipeline(rate, periodSize, channelCount);
+
+  vector<float> audioBuffer(channelCount * periodSize);
+
+  AudioParam audioParam { rate, (uint32_t)periodSize, channelCount };
+  thread audioThread(audioLoop, audioDevice, audioParam, [&](sample_t* buffer) {
+    {
+      lock_guard<mutex> guard(lock);
+      pipeline->generate(periodSize, audioBuffer.data(), 0, nullptr);
+    }
+    encodeToBufferFmt(periodSize * channelCount, audioBuffer.data(), buffer);
+  });
+
+  thread midiThread(midiLoop, midiDevice, [&](const snd_seq_event_t* ev) {
+    static const unsigned char listenChannel = 0;
+    static const unsigned char sustainControlNumber = 64;
+    if (ev->data.control.channel != listenChannel) {
+      return;
+    }
+    {
+      lock_guard<mutex> guard(lock);
+      switch (ev->type) {
+        case SND_SEQ_EVENT_CONTROLLER: 
+          if (ev->data.control.param == sustainControlNumber) {
+            if (ev->data.control.value == 0) {
+              pipeline->sustainOffEvent();
+            } else {
+              pipeline->sustainOnEvent();
+            }
+          }
+          break;
+        case SND_SEQ_EVENT_NOTEON:
+        case SND_SEQ_EVENT_NOTEOFF: 
+          if (ev->data.note.velocity == 0 || ev->type == SND_SEQ_EVENT_NOTEOFF) {
+            pipeline->noteOffEvent(ev->data.note.note);
+          } else {
+            pipeline->noteOnEvent(ev->data.note.note, ev->data.note.velocity);
+          }
+          break;        
+        case SND_SEQ_EVENT_CHANPRESS:
+          pipeline->channelPressureEvent(ev->data.control.value);
+          break;        
+      }
+    }
+  });
+
+  audioThread.join();
+  midiThread.join();
+}
+
 int main(int argc, char *argv[]) {
   struct option long_option[] =
   {
@@ -234,17 +294,9 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  AudioParam audioParam { rate, (uint32_t)bufferSize, channelCount };
-  shared_ptr<MidiAudioElement<float>> pipeline = build_pipeline(rate, bufferSize, channelCount);
-
   snd_seq_t *midiDevice = openMidiDevice();
 
-  mutex lock;
-  thread audioThread(audioLoop, audioDevice, ref(lock), pipeline, audioParam);
-  thread midiThread(midiLoop, midiDevice, ref(lock), pipeline);
-
-  audioThread.join();
-  midiThread.join();
+  loop(audioDevice, midiDevice);
 
   snd_pcm_close(audioDevice);
   return 0;
