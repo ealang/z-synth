@@ -18,6 +18,7 @@ shared_ptr<MidiAudioElement<float>> build_pipeline(AudioParams params, bool dump
   }
 
   builder.registerMidi(synth);
+  builder.registerMidi(amp);
 
   builder.registerElem("synth", synth);
   builder.registerElem("amp", amp);

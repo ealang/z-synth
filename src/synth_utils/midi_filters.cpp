@@ -27,11 +27,13 @@ std::tuple<bool, uint8_t, uint8_t> noteMap(const snd_seq_event_t* event) {
   );
 }
 
-bool sustainFilter(const snd_seq_event_t* event) {
-  static const unsigned char sustainControlNumber = 64;
-  return event->data.control.param == sustainControlNumber;
+std::function<bool(const snd_seq_event_t*)> controlFilter(uint32_t param) {
+  return [param](const snd_seq_event_t* event) {
+    return event->type == SND_SEQ_EVENT_CONTROLLER &&
+           event->data.control.param == param;
+  };
 }
 
-uint8_t sustainMap(const snd_seq_event_t* event) {
+int controlMap(const snd_seq_event_t* event) {
   return event->data.control.value;
 }

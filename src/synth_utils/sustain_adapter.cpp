@@ -26,10 +26,10 @@ void SustainAdapter::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
       );
 
   sub2 = midi
-    | Rx::filter(sustainFilter)
-    | Rx::map(sustainMap)
-    | Rx::subscribe<uint8_t>(
-        [this](uint8_t amount) {
+    | Rx::filter(controlFilter(MIDI_PARAM_SUSTAIN))
+    | Rx::map(controlMap)
+    | Rx::subscribe<int>(
+        [this](int amount) {
           if (amount == 0) {
             sustainOffEvent();
           } else {

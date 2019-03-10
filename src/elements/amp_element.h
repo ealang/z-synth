@@ -6,11 +6,15 @@
 /**
  * Control amplitude of an input using a multipier.
  */
-class AmpElement: public AudioElement<float> {
-  float amp;
+class AmpElement: public MidiAudioElement<float> {
+  float masterAmp;
+  float channelAmp = 1;
   uint32_t channelCount;
+  Rx::subscription sub;
 public:
-  AmpElement(float amp, uint32_t channelCount);
+  AmpElement(float masterAmp, uint32_t channelCount);
+  ~AmpElement();
+  void injectMidi(Rx::observable<const snd_seq_event_t*>) override;
   uint32_t maxInputs() override;
   void generate(uint32_t numSamples, float* out, uint32_t numInputs, inputs_t<float> inputs) override;
 };

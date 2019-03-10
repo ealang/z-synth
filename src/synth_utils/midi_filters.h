@@ -11,7 +11,12 @@ std::function<bool(const snd_seq_event_t*)> channelFilter(unsigned char channel)
 bool noteFilter(const snd_seq_event_t* event);
 std::tuple<bool, uint8_t, uint8_t> noteMap(const snd_seq_event_t* event);
 
-bool sustainFilter(const snd_seq_event_t* event);
-uint8_t sustainMap(const snd_seq_event_t* event);
+// filter control messages matching `param`
+std::function<bool(const snd_seq_event_t*)> controlFilter(uint32_t param);
+// return value of the control message
+int controlMap(const snd_seq_event_t* event);
+
+#define MIDI_PARAM_SUSTAIN 64
+#define MIDI_PARAM_CHANNEL_VOLUME 7
 
 #endif
