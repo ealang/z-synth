@@ -18,6 +18,22 @@ public:
   vector<NoteOn> ons;
   vector<unsigned char> offs;
 
+  void noteOnEvent(unsigned char note, unsigned char vel) {
+    SustainAdapter::noteOnEvent(note, vel);
+  }
+
+  void noteOffEvent(unsigned char note) {
+    SustainAdapter::noteOffEvent(note);
+  }
+
+  void sustainOnEvent() {
+    SustainAdapter::sustainOnEvent();
+  }
+
+  void sustainOffEvent() {
+    SustainAdapter::sustainOffEvent();
+  }
+
 private:
   void sustainNoteOnEvent(unsigned char note, unsigned char vel) {
     ons.push_back(NoteOn { note, vel });

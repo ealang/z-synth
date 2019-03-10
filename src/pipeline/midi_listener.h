@@ -1,15 +1,12 @@
 #ifndef MIDI_LISTENER_H
 #define MIDI_LISTENER_H
 
-#include <cstdint>
+#include <alsa/seq_event.h>
+#include "./rx_include.h"
 
 class MidiListener {
 public:
-  virtual void noteOnEvent(uint8_t, uint8_t) {}
-  virtual void noteOffEvent(uint8_t) {}
-  virtual void sustainOnEvent() {}
-  virtual void sustainOffEvent() {}
-  virtual void channelPressureEvent(uint8_t) {}
+  virtual void injectMidi(Rx::observable<const snd_seq_event_t*>) = 0;
 };
 
 #endif

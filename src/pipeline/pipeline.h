@@ -4,7 +4,6 @@
 #include <iostream>
 #include <sstream>
 #include <exception>
-#include <tuple>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -128,33 +127,9 @@ class Pipeline: public MidiAudioElement<T> {
     } 
   }
 
-  void noteOnEvent(uint8_t note, uint8_t vel) {
-    for (const auto& listener: midiElems) {
-      listener->noteOnEvent(note, vel);
-    }
-  }
-
-  void noteOffEvent(uint8_t note) {
-    for (const auto& listener: midiElems) {
-      listener->noteOffEvent(note);
-    }
-  }
-
-  void sustainOnEvent() {
-    for (const auto& listener: midiElems) {
-      listener->sustainOnEvent();
-    }
-  }
-
-  void sustainOffEvent() {
-    for (const auto& listener: midiElems) {
-      listener->sustainOffEvent();
-    }
-  }
-
-  void channelPressureEvent(uint8_t val) {
-    for (const auto& listener: midiElems) {
-      listener->channelPressureEvent(val);
+  void injectMidi(Rx::observable<const snd_seq_event_t*> observable) override {
+    for (auto elem: midiElems) {
+      elem->injectMidi(observable);
     }
   }
 };

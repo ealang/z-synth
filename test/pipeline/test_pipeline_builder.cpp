@@ -10,7 +10,7 @@
 using namespace std;
 
 /* Present a constant value at the output. */
-class ConstElem: public MidiAudioElement<int> {
+class ConstElem: public AudioElement<int> {
   int val;
 public:
   ConstElem(int val): val(val) {}
@@ -23,7 +23,7 @@ public:
 };
 
 /* Sum all inputs plus a given value. */
-class SumElem: public MidiAudioElement<int> {
+class SumElem: public AudioElement<int> {
   int add;
 public:
   SumElem(int add): add(add) {}

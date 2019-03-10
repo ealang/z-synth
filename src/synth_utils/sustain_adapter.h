@@ -18,14 +18,18 @@ class SustainAdapter: public MidiListener {
   std::unordered_map<unsigned char, unsigned char> sustainPlays;
   std::unordered_set<unsigned char> heldNotes;
   bool sustained = false;
+  Rx::subscription sub1, sub2;
 
 public:
-  void noteOnEvent(unsigned char note, unsigned char vel) override;
-  void noteOffEvent(unsigned char note) override;
-  void sustainOnEvent() override;
-  void sustainOffEvent() override;
+  ~SustainAdapter();
+  void injectMidi(Rx::observable<const snd_seq_event_t*>) override;
 
 protected:
+  void noteOnEvent(unsigned char note, unsigned char vel);
+  void noteOffEvent(unsigned char note);
+  void sustainOnEvent();
+  void sustainOffEvent();
+
   // Callbacks to be implemented
   virtual void sustainNoteOnEvent(unsigned char note, unsigned char vel) = 0;
   virtual void sustainNoteOffEvent(unsigned char note) = 0;
