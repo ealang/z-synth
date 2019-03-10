@@ -4,12 +4,13 @@
 static void help(const CLIParams& params) {
   printf(
     "Usage: midisynth [OPTION]... [FILE]...\n"
-    "-h,--help      help\n"
-    "-D,--device    playback device (default: %s)\n"
-    "-r,--rate      stream rate in Hz (default: %d)\n"
-    "-b,--buffer    buffer size in ms (default: %d)\n"
-    "-p,--period    period size in ms (default: %d)\n"
-    "-c,--channels  number of channels (default: %d)\n"
+    "-h,--help       help\n"
+    "-D,--device     playback device (default: %s)\n"
+    "-r,--rate       stream rate in Hz (default: %d)\n"
+    "-b,--buffer     buffer size in ms (default: %d)\n"
+    "-p,--period     period size in ms (default: %d)\n"
+    "-c,--channels   number of channels (default: %d)\n"
+    "-m,--dump-midi  print midi messages\n"
     "\n",
     params.device.c_str(),
     params.rate,
@@ -29,6 +30,7 @@ CLIParams parseArgs(int argc, char *argv[]) {
     {"buffer", 1, NULL, 'b'},
     {"period", 1, NULL, 'p'},
     {"channels", 1, NULL, 'c'},
+    {"dump-midi", 0, NULL, 'm'},
     {NULL, 0, NULL, 0},
   };
   int morehelp = 0;
@@ -54,6 +56,9 @@ CLIParams parseArgs(int argc, char *argv[]) {
         break;
       case 'c':
         params.channelCount = atoi(optarg);
+        break;
+      case 'm':
+        params.dumpMidi = true;
     }
   }
   if (morehelp) {

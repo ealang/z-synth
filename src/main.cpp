@@ -12,14 +12,14 @@
 
 using namespace std;
 
-void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice) {
+void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLIParams cliParams) {
   mutex lock;
 
   Rx::subject<const snd_seq_event_t*> midiSubject;
   auto midiObservable = midiSubject.get_observable() |
     Rx::filter(channelFilter(0));
 
-  shared_ptr<MidiAudioElement<float>> pipeline = build_pipeline(params);
+  shared_ptr<MidiAudioElement<float>> pipeline = build_pipeline(params, cliParams.dumpMidi);
   pipeline->injectMidi(midiObservable);
 
   thread audioThread(audioLoop, audioDevice, params, [&](float* buffer) {
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
   snd_pcm_t* audioDevice = audioInfo.first;
   AudioParams audioParams = audioInfo.second;
 
-  loop(audioParams, audioDevice, midiDevice);
+  loop(audioParams, audioDevice, midiDevice, cliParams);
 
   return 0;
 }

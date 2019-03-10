@@ -2,7 +2,9 @@
 
 std::function<bool(const snd_seq_event_t*)> channelFilter(unsigned char channel) {
   return [=](const snd_seq_event_t* event) {
-    return event->data.control.channel == channel;
+    return event->type >= SND_SEQ_EVENT_NOTE &&
+           event->type <= SND_SEQ_EVENT_KEYSIGN &&
+           event->data.control.channel == channel;
   };
 }
 

@@ -3,16 +3,20 @@
 
 #include "./elements/generator_element.h"
 #include "./elements/amp_element.h"
+#include "./elements/midi_tap.h"
 
 using namespace std;
 
-shared_ptr<MidiAudioElement<float>> build_pipeline(AudioParams params) {
+shared_ptr<MidiAudioElement<float>> build_pipeline(AudioParams params, bool dumpMidi) {
   PipelineBuilder<float> builder;
 
   auto synth = make_shared<GeneratorElement>(params.sampleRateHz, params.channelCount);
   auto amp = make_shared<AmpElement>(0.04, params.channelCount);
+  auto tap = make_shared<MidiTap>(dumpMidi);
 
   builder.registerMidi(synth);
+  builder.registerMidi(tap);
+
   builder.registerElem("synth", synth);
   builder.registerElem("amp", amp);
 
