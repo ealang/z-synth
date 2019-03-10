@@ -4,9 +4,18 @@ A minimal synth that uses ALSA. The intention is to provide a synth that can ope
 
 The current sound is a square wave with some filtering and an amp envelope.
 
-The synth configuration is hardcoded. No parameters are exposed at runtime.
-
 Internally, the project's design allows for audio elements (e.g. generator, amplifier, filter) to be connected together in an acyclic graph to create the final sound.
+
+## Supported Midi Params
+
+| Control Number | Function        |
+|----------------|-----------------|
+| 1              | Distortion level (Mod wheel)
+| 7              | Channel volume |
+| 72             | Release time   |
+| 73             | Attack time    |
+| 74             | Sustain level  |
+| 75             | Decay time     |
 
 ## Dependencies
 
