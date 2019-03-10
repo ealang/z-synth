@@ -23,42 +23,37 @@ static string dumpControl(snd_seq_ev_ctrl_t* data) {
   return s.str();
 }
 
-MidiTap::MidiTap(bool enabled): enabled(enabled) {}
-
 void MidiTap::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
-  if (enabled) {
-    midi
-      | Rx::subscribe<const snd_seq_event_t*>([](const snd_seq_event_t* event) {
-          switch (event->type) {
-            case SND_SEQ_EVENT_NOTEON:
-              cout << "NOTEON " << dumpNote((snd_seq_ev_note_t*)(&event->data));
-              break;
-            case SND_SEQ_EVENT_NOTEOFF:
-              cout << "NOTEOFF " << dumpNote((snd_seq_ev_note_t*)(&event->data));
-              break;
-            case SND_SEQ_EVENT_NOTE:
-              cout << "NOTE " << dumpNote((snd_seq_ev_note_t*)(&event->data));
-              break;
-            case SND_SEQ_EVENT_KEYPRESS:
-              cout << "KEY PRESSURE " << dumpNote((snd_seq_ev_note_t*)(&event->data));
-              break;
-            case SND_SEQ_EVENT_CONTROLLER:
-              cout << "CONTROLLER " << dumpControl((snd_seq_ev_ctrl_t*)(&event->data));
-              break;
-            case SND_SEQ_EVENT_PGMCHANGE:
-              cout << "PGMCHANGE " << dumpControl((snd_seq_ev_ctrl_t*)(&event->data));
-              break;
-            case SND_SEQ_EVENT_PITCHBEND:
-              cout << "PITCH BEND " << dumpControl((snd_seq_ev_ctrl_t*)(&event->data));
-              break;
-            case SND_SEQ_EVENT_CHANPRESS:
-              cout << "CHAN PRESSURE " << dumpControl((snd_seq_ev_ctrl_t*)(&event->data));
-              break;
-          }
-        });
-  }
+  midi
+    | Rx::subscribe<const snd_seq_event_t*>([](const snd_seq_event_t* event) {
+        switch (event->type) {
+          case SND_SEQ_EVENT_NOTEON:
+            cout << "NOTEON " << dumpNote((snd_seq_ev_note_t*)(&event->data));
+            break;
+          case SND_SEQ_EVENT_NOTEOFF:
+            cout << "NOTEOFF " << dumpNote((snd_seq_ev_note_t*)(&event->data));
+            break;
+          case SND_SEQ_EVENT_NOTE:
+            cout << "NOTE " << dumpNote((snd_seq_ev_note_t*)(&event->data));
+            break;
+          case SND_SEQ_EVENT_KEYPRESS:
+            cout << "KEY PRESSURE " << dumpNote((snd_seq_ev_note_t*)(&event->data));
+            break;
+          case SND_SEQ_EVENT_CONTROLLER:
+            cout << "CONTROLLER " << dumpControl((snd_seq_ev_ctrl_t*)(&event->data));
+            break;
+          case SND_SEQ_EVENT_PGMCHANGE:
+            cout << "PGMCHANGE " << dumpControl((snd_seq_ev_ctrl_t*)(&event->data));
+            break;
+          case SND_SEQ_EVENT_PITCHBEND:
+            cout << "PITCH BEND " << dumpControl((snd_seq_ev_ctrl_t*)(&event->data));
+            break;
+          case SND_SEQ_EVENT_CHANPRESS:
+            cout << "CHAN PRESSURE " << dumpControl((snd_seq_ev_ctrl_t*)(&event->data));
+            break;
+        }
+      });
 }
-
 
 MidiTap::~MidiTap() {
   sub.unsubscribe();

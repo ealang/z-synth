@@ -12,10 +12,12 @@ shared_ptr<MidiAudioElement<float>> build_pipeline(AudioParams params, bool dump
 
   auto synth = make_shared<GeneratorElement>(params.sampleRateHz, params.channelCount);
   auto amp = make_shared<AmpElement>(0.04, params.channelCount);
-  auto tap = make_shared<MidiTap>(dumpMidi);
+  if (dumpMidi) {
+    auto tap = make_shared<MidiTap>();
+    builder.registerMidi(tap);
+  }
 
   builder.registerMidi(synth);
-  builder.registerMidi(tap);
 
   builder.registerElem("synth", synth);
   builder.registerElem("amp", amp);

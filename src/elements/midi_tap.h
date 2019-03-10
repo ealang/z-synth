@@ -5,9 +5,7 @@
 
 class MidiTap: public MidiListener {
   Rx::subscription sub;
-  bool enabled;
 public:
-  MidiTap(bool enabled);
   ~MidiTap();
   void injectMidi(Rx::observable<const snd_seq_event_t*>) override;
 };
