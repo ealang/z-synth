@@ -3,10 +3,10 @@
 
 #include "../pipeline/midi_listener.h"
 
-class MidiTap: public MidiListener {
+class MidiTapElement: public MidiListener {
   Rx::subscription sub;
 public:
-  ~MidiTap();
+  ~MidiTapElement();
   void injectMidi(Rx::observable<const snd_seq_event_t*>) override;
 };
 

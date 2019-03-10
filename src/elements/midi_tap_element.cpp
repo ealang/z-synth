@@ -1,7 +1,7 @@
 #include <string>
 #include <iostream>
 #include <sstream>
-#include "./midi_tap.h"
+#include "./midi_tap_element.h"
 
 using namespace std;
 
@@ -23,7 +23,7 @@ static string dumpControl(snd_seq_ev_ctrl_t* data) {
   return s.str();
 }
 
-void MidiTap::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
+void MidiTapElement::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
   midi
     | Rx::subscribe<const snd_seq_event_t*>([](const snd_seq_event_t* event) {
         switch (event->type) {
@@ -55,6 +55,6 @@ void MidiTap::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
       });
 }
 
-MidiTap::~MidiTap() {
+MidiTapElement::~MidiTapElement() {
   sub.unsubscribe();
 }
