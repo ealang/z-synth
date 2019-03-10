@@ -19,5 +19,9 @@ int controlMap(const snd_seq_event_t* event);
 #define MIDI_PARAM_MOD_WHEEL 1
 #define MIDI_PARAM_CHANNEL_VOLUME 7
 #define MIDI_PARAM_SUSTAIN 64
+#define MIDI_PARAM_RELEASE_TIME 72
+#define MIDI_PARAM_ATTACK_TIME 73
+#define MIDI_PARAM_BRIGHTNESS 74
+#define MIDI_PARAM_DECAY_TIME 75
 
 #endif

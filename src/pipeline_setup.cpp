@@ -11,7 +11,7 @@ using namespace std;
 shared_ptr<MidiAudioElement<float>> build_pipeline(AudioParams params, bool dumpMidi) {
   PipelineBuilder<float> builder;
 
-  auto synth = make_shared<GeneratorElement>(params.sampleRateHz, params.channelCount);
+  shared_ptr<MidiAudioElement<float>> synth = make_shared<GeneratorElement>(params.sampleRateHz, params.channelCount);
   auto amp = make_shared<AmpElement>(0.04, params.channelCount);
   auto dist = make_shared<DistortionElement>(params);
   if (dumpMidi) {

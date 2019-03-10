@@ -19,13 +19,21 @@ class SquareElement: public AudioElement<float> {
   const uint32_t attackSampleSize;
   const uint32_t releaseSampleSize;
   const uint32_t decaySampleSize;
+  const float attackAmp;
+  const float sustainAmp;
+  float releaseAmp;
+  float curAmp();
 
 public:
   SquareElement(
     uint32_t sampleRateHz,
     uint32_t channelCount,
     float freqHz,
-    float maxAmp
+    float maxAmp,
+    float attackTimeMs,
+    float releaseTimeMs,
+    float decayTimeMs,
+    float sustainAmp
   );
 
   uint32_t maxInputs() override;

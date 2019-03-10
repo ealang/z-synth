@@ -6,11 +6,16 @@
 #include "./filter_element.h"
 #include "./generator_element.h"
 #include "../synth_utils/linear_scale.h"
+#include "../synth_utils/midi_filters.h"
 
 using namespace std;
 
 static const auto filtScale = linearScaleClamped(30, 96, 50./41000, 7./41000);
 static const auto ampScale = linearScaleClamped(60, 96, 1, 0.15);
+static const auto attackScale = linearScaleClamped(0, 127, 1, 1000);
+static const auto decayScale = attackScale;
+static const auto releaseScale = linearScaleClamped(0, 127, 1, 4000);
+static const auto sustainScale = linearScaleClamped(0, 127, 0.1, 1);
 
 static float midiNoteToFreq(unsigned char note) {
   return 440 * powf(2, (static_cast<float>(note) - 69) / 12);
@@ -29,9 +34,24 @@ public:
     uint32_t sampleRateHz,
     uint32_t channelCount,
     unsigned char note,
-    unsigned char velocity
+    unsigned char velocity,
+    float attackTimeMs,
+    float releaseTimeMs,
+    float decayTimeMs,
+    float sustainAmp
   ): channelCount(channelCount),
-     square(SquareElement(sampleRateHz, channelCount, midiNoteToFreq(note), (velocity / 127.) * ampScale(note))),
+     square(
+       SquareElement(
+         sampleRateHz,
+         channelCount,
+         midiNoteToFreq(note),
+         (velocity / 127.) * ampScale(note),
+         attackTimeMs,
+         releaseTimeMs,
+         decayTimeMs,
+         sustainAmp
+       )
+     ),
      filter(filtScale(note) * sampleRateHz, channelCount)
   {}
 
@@ -68,7 +88,38 @@ public:
 GeneratorElement::GeneratorElement(
   uint32_t sampleRateHz,
   uint32_t channelCount
-): sampleRateHz(sampleRateHz), channelCount(channelCount) {
+): sampleRateHz(sampleRateHz), channelCount(channelCount) {}
+
+GeneratorElement::~GeneratorElement() {
+  for (auto sub: subs) {
+    sub.unsubscribe();
+  }
+}
+
+void GeneratorElement::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
+  SustainAdapter::injectMidi(midi);
+  subs = {
+    midi | Rx::filter(controlFilter(MIDI_PARAM_RELEASE_TIME))
+         | Rx::map(controlMap)
+         | Rx::subscribe<int>([this](int value) {
+             releaseTimeMs = releaseScale(value);
+           }),
+    midi | Rx::filter(controlFilter(MIDI_PARAM_ATTACK_TIME))
+         | Rx::map(controlMap)
+         | Rx::subscribe<int>([this](int value) {
+             attackTimeMs = attackScale(value);
+           }),
+    midi | Rx::filter(controlFilter(MIDI_PARAM_DECAY_TIME))
+         | Rx::map(controlMap)
+         | Rx::subscribe<int>([this](int value) {
+             decayTimeMs = decayScale(value);
+           }),
+    midi | Rx::filter(controlFilter(MIDI_PARAM_BRIGHTNESS))
+         | Rx::map(controlMap)
+         | Rx::subscribe<int>([this](int value) {
+             sustainAmp = sustainScale(value);
+           })
+  };
 }
 
 uint32_t GeneratorElement::createId() {
@@ -116,7 +167,11 @@ void GeneratorElement::sustainNoteOnEvent(unsigned char note, unsigned char velo
       sampleRateHz,
       channelCount,
       note,
-      velocity
+      velocity,
+      attackTimeMs,
+      releaseTimeMs,
+      decayTimeMs,
+      sustainAmp
   ));
 }
 

@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 #include "./midi_tap_element.h"
+#include "../synth_utils/midi_filters.h"
 
 using namespace std;
 
@@ -16,10 +17,36 @@ static string dumpNote(snd_seq_ev_note_t* data) {
 }
 
 static string dumpControl(snd_seq_ev_ctrl_t* data) {
+  string known;
+  switch (data->param) {
+    case MIDI_PARAM_MOD_WHEEL:
+      known = "(mod wheel)";
+      break;
+    case MIDI_PARAM_CHANNEL_VOLUME:
+      known = "(chan vol)";
+      break;
+    case MIDI_PARAM_SUSTAIN:
+      known = "(sustain ped)";
+      break;
+    case MIDI_PARAM_RELEASE_TIME:
+      known = "(release time)";
+      break;
+    case MIDI_PARAM_ATTACK_TIME:
+      known = "(attack time)";
+      break;
+    case MIDI_PARAM_BRIGHTNESS:
+      known = "(brightness)";
+      break;
+    case MIDI_PARAM_DECAY_TIME:
+      known = "(decay time)";
+  }
+
   ostringstream s;
   s << "ch: " << int(data->channel) << " "
     << "param: " << int(data->param) << " "
-    << "value: " << int(data->value) << endl;
+    << "value: " << int(data->value) << " "
+    << known << endl;
+ 
   return s.str();
 }
 
