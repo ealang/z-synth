@@ -6,6 +6,7 @@
 #include "./alsa/alsa.h"
 #include "./alsa/loops.h"
 
+#include "./metric.h"
 #include "./cli.h"
 #include "./pipeline_setup.h"
 #include "./synth_utils/midi_filters.h"
@@ -19,12 +20,30 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
   auto midiObservable = midiSubject.get_observable() |
     Rx::filter(channelFilter(0));
 
+  int periodsPerSec = params.sampleRateHz / params.bufferSampleCount;
+  Metric audioLatency(periodsPerSec * 10);
+
   shared_ptr<MidiAudioElement<float>> pipeline = build_pipeline(params, cliParams.dumpMidi);
   pipeline->injectMidi(midiObservable);
 
+  uint32_t i = 0;
+
   thread audioThread(audioLoop, audioDevice, params, [&](float* buffer) {
     lock_guard<mutex> guard(lock);
-    pipeline->generate(params.bufferSampleCount, buffer, 0, nullptr);
+    {
+      TimeMetricRAII time(audioLatency);
+      pipeline->generate(params.bufferSampleCount, buffer, 0, nullptr);
+    }
+
+    i += 1;
+    if (cliParams.dumpMetrics && (i % periodsPerSec) == 0) {
+      auto report = audioLatency.report();
+      printf("Audio gen time: max=%.3fmS p99=%.3fmS p75=%.3fmS\n",
+        report.max * 1000,
+        report.p99 * 1000,
+        report.p75 * 1000
+      );
+    }
   });
 
   thread midiThread(midiLoop, midiDevice, [&](const snd_seq_event_t* ev) {

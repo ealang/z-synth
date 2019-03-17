@@ -13,6 +13,7 @@ struct CLIParams {
   uint32_t periodTimeMs = 5;
   uint32_t channelCount = 2;
   bool dumpMidi = false;
+  bool dumpMetrics = false;
 };
 
 CLIParams parseArgs(int argc, char *argv[]);
