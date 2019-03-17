@@ -21,7 +21,11 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
     Rx::filter(channelFilter(0));
 
   int periodsPerSec = params.sampleRateHz / params.bufferSampleCount;
-  Metric audioLatency(periodsPerSec * 10);
+  int metricSeconds = 10;
+  Metric audioLatency(periodsPerSec * metricSeconds);
+  if (cliParams.dumpMetrics) {
+    printf("Dumping audio gen time (%d second sliding window, %d periods)\n", metricSeconds, metricSeconds * periodsPerSec);
+  }
 
   shared_ptr<MidiAudioElement<float>> pipeline = build_pipeline(params, cliParams.dumpMidi);
   pipeline->injectMidi(midiObservable);
