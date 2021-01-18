@@ -27,8 +27,7 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
     printf("Dumping audio gen time (%d second sliding window, %d periods)\n", metricSeconds, metricSeconds * periodsPerSec);
   }
 
-  shared_ptr<MidiAudioElement<float>> pipeline = build_pipeline(params, cliParams.dumpMidi);
-  pipeline->injectMidi(midiObservable);
+  shared_ptr<AudioElement<float>> pipeline = build_pipeline(params, cliParams.dumpMidi, midiObservable);
 
   uint32_t i = 0;
 

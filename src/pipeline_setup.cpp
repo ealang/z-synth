@@ -8,7 +8,7 @@
 
 using namespace std;
 
-shared_ptr<MidiAudioElement<float>> build_pipeline(AudioParams params, bool dumpMidi) {
+shared_ptr<AudioElement<float>> build_pipeline(AudioParams params, bool dumpMidi, Rx::observable<const snd_seq_event_t*> globalMidi) {
   PipelineBuilder<float> builder;
 
   shared_ptr<MidiAudioElement<float>> synth = make_shared<GeneratorElement>(params.sampleRateHz, params.channelCount);
@@ -16,12 +16,12 @@ shared_ptr<MidiAudioElement<float>> build_pipeline(AudioParams params, bool dump
   auto dist = make_shared<DistortionElement>(params);
   if (dumpMidi) {
     auto tap = make_shared<MidiTapElement>();
-    builder.registerMidi(tap);
+    tap->injectMidi(globalMidi);
   }
 
-  builder.registerMidi(synth);
-  builder.registerMidi(amp);
-  builder.registerMidi(dist);
+  synth->injectMidi(globalMidi);
+  amp->injectMidi(globalMidi);
+  dist->injectMidi(globalMidi);
 
   builder.registerElem("synth", synth);
   builder.registerElem("dist", dist);

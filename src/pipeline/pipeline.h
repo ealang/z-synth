@@ -18,12 +18,11 @@ struct ExecutionStep {
 };
 
 /**
- * Given a DAG of elements, construct a meta element that treats the
+ * Given a DAG of audio elements, construct a meta element that treats the
  * entire DAG as a single element.
  */
 template <typename T>
-class Pipeline: public MidiAudioElement<T> {
-  std::vector<std::shared_ptr<MidiListener>> midiElems;
+class Pipeline: public AudioElement<T> {
   std::vector<ExecutionStep<T>> steps;
 
   uint32_t bufferSize;
@@ -35,10 +34,9 @@ class Pipeline: public MidiAudioElement<T> {
     uint32_t bufferSize,
     uint32_t channelCount,
     std::unordered_map<std::string, std::shared_ptr<AudioElement<T>>> audioElems,
-    std::vector<std::shared_ptr<MidiListener>> midiElems,
     std::string outputName,
     connections_t connections
-  ): midiElems(midiElems), bufferSize(bufferSize) {
+  ): bufferSize(bufferSize) {
     plan_t plan = planExecution(connections);
 
     if (audioElems.size() == 0) {
@@ -125,12 +123,6 @@ class Pipeline: public MidiAudioElement<T> {
       inputs_t<T> ins = step.in.data();
       step.elem->generate(numSamples, step.out, step.in.size(), ins);
     } 
-  }
-
-  void injectMidi(Rx::observable<const snd_seq_event_t*> observable) override {
-    for (auto elem: midiElems) {
-      elem->injectMidi(observable);
-    }
   }
 };
 

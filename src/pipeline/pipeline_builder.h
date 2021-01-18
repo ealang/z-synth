@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "./pipeline.h"
-#include "./midi_listener.h"
 #include "./pipeline_element.h"
 
 /* Allow at-runtime construction of an audio pipeline. Elements can
@@ -17,13 +16,11 @@
 template <typename T>
 class PipelineBuilder {
   std::unordered_map<std::string, std::shared_ptr<AudioElement<T>>> audioElems;
-  std::vector<std::shared_ptr<MidiListener>> midiElems;
   std::string outputElem;
   connections_t connections;
 
   void reset() {
     audioElems.clear();
-    midiElems.clear();
     connections.clear();
   }
 
@@ -35,10 +32,6 @@ public:
     }
   }
 
-  void registerMidi(std::shared_ptr<MidiListener> elem) {
-    midiElems.push_back(elem);
-  }
-
   void connectElems(std::string from, std::string to) {
     connections[from].insert(to);
   }
@@ -47,12 +40,11 @@ public:
     outputElem = name;
   }
 
-  std::shared_ptr<MidiAudioElement<T>> build(uint32_t bufferSize, uint32_t channelCount) {
+  std::shared_ptr<AudioElement<T>> build(uint32_t bufferSize, uint32_t channelCount) {
     auto pipeline = std::make_shared<Pipeline<T>>(
       bufferSize,
       channelCount,
       audioElems,
-      midiElems,
       outputElem,
       connections
     );
