@@ -51,7 +51,7 @@ static string dumpControl(snd_seq_ev_ctrl_t* data) {
 }
 
 void MidiTapElement::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
-  midi
+  sub = midi
     | Rx::subscribe<const snd_seq_event_t*>([](const snd_seq_event_t* event) {
         switch (event->type) {
           case SND_SEQ_EVENT_NOTEON:

@@ -6,8 +6,10 @@
 #include "./alsa/alsa.h"
 #include "./alsa/loops.h"
 
-#include "./metric.h"
 #include "./cli.h"
+#include "./elements/midi_tap_element.h"
+#include "./elements/polyphony_element.h"
+#include "./metric.h"
 #include "./pipeline_setup.h"
 #include "./synth_utils/midi_filters.h"
 
@@ -17,8 +19,17 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
   mutex lock;
 
   Rx::subject<const snd_seq_event_t*> midiSubject;
-  auto midiObservable = midiSubject.get_observable() |
+  auto globalMidi = midiSubject.get_observable() |
     Rx::filter(channelFilter(0));
+
+  MidiTapElement tap;
+  if (cliParams.dumpMidi) {
+    tap.injectMidi(globalMidi);
+  }
+
+  const uint32_t polyphonyCount = 1;
+  PolyphonyElement polyphony(polyphonyCount);
+  polyphony.injectMidi(globalMidi);
 
   int periodsPerSec = params.sampleRateHz / params.bufferSampleCount;
   int metricSeconds = 10;
@@ -27,7 +38,7 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
     printf("Dumping audio gen time (%d second sliding window, %d periods)\n", metricSeconds, metricSeconds * periodsPerSec);
   }
 
-  shared_ptr<AudioElement<float>> pipeline = build_pipeline(params, cliParams.dumpMidi, midiObservable);
+  shared_ptr<AudioElement<float>> pipeline = build_pipeline(params, globalMidi, polyphony);
 
   uint32_t i = 0;
 
