@@ -25,7 +25,8 @@ public:
   ~PolyphonyElement();
 
   void injectMidi(Rx::observable<const snd_seq_event_t*>) override;
-  Rx::observable<const snd_seq_event_t*> voiceEvents(uint32_t voiceNumber) const;
+  Rx::observable<const snd_seq_event_t*> voiceChannel(uint32_t voiceNumber) const;
+  uint32_t polyphonyCount() const;
 };
 
 #endif

@@ -11,7 +11,7 @@ class PolyphonyElement;
 class ReplicaSynth
 {
   std::shared_ptr<AudioElement<float>> p;
-  static const uint32_t polyphonyCount = 1;
+  static const uint32_t polyphonyCount = 8;
   std::shared_ptr<PolyphonyElement> polyphony;
 
   public:

@@ -1,57 +1,15 @@
-#include <algorithm>
-#include <stdio.h>
-#include <math.h>
-
-#include "square_element.h"
+#include <string.h>
+#include "../synth_utils/midi_note_to_freq.h"
+#include "./square_element.h"
 
 using namespace std;
 
-SquareElement::SquareElement(
-    uint32_t sampleRateHz,
-    uint32_t channelCount,
-    float freqHz,
-    float maxAmp,
-    float attackTimeMs,
-    float releaseTimeMs,
-    float decayTimeMs,
-    float _sustainAmp
-): sampleRateHz(sampleRateHz),
-  channelCount(channelCount),
-  maxAmp(maxAmp),
-  periodSize(1.0 / freqHz),
-  stepSize(1.0 / sampleRateHz),
-  attackSampleSize((attackTimeMs / 1000) * sampleRateHz),
-  releaseSampleSize((releaseTimeMs / 1000) * sampleRateHz),
-  decaySampleSize((decayTimeMs / 1000) * sampleRateHz),
-  attackAmp(decaySampleSize == 0 ? _sustainAmp : 1),
-  sustainAmp(_sustainAmp),
-  releaseAmp(_sustainAmp) {
-}
-
-bool SquareElement::isExhausted() {
-  return off && sampleCount >= offSample + releaseSampleSize;
-}
+SquareElement::SquareElement(uint32_t sampleRateHz, uint32_t channelCount)
+  : sampleRateHz(sampleRateHz),
+    channelCount(channelCount) {}
 
 uint32_t SquareElement::maxInputs() {
   return 0;
-}
-
-inline float SquareElement::curAmp() {
-  float amp;
-  if (off) {
-    amp = releaseAmp * max(
-        0.f,
-        (1 - (sampleCount - offSample) / (float)releaseSampleSize) * sustainAmp
-    );
-  } else if (sampleCount < attackSampleSize) {
-    amp = ((float)sampleCount / attackSampleSize) * attackAmp;
-  } else if (sampleCount < attackSampleSize + decaySampleSize) {
-    float p = (sampleCount - attackSampleSize) / (float)decaySampleSize;
-    amp = 1 - p * (1 - sustainAmp);
-  } else {
-    amp = sustainAmp;
-  }
-  return amp;
 }
 
 void SquareElement::generate(
@@ -60,23 +18,49 @@ void SquareElement::generate(
   uint32_t,
   inputs_t<float>
 ) {
-  float halfPeriodSize = periodSize / 2;
-  for (uint32_t i = 0; i < numSamples; i++) {
-    float val = (phase > halfPeriodSize ? 1 : -1) * curAmp() * maxAmp;
-    for (uint32_t c = 0; c < channelCount; c++) {
-      out[i * channelCount + c] = val;
-    }
+  if (!shouldPlay)
+  {
+    uint32_t channelSize = numSamples * sizeof(float);
+    memset(out, 0, channelSize * channelCount);
+    return;
+  }
 
-    phase += stepSize;
-    sampleCount++;
-    if (phase >= periodSize) {
-      phase -= periodSize;
+  // generate first channel
+  uint32_t halfPeriodSize = periodSize / 2;
+  float *dst = out;
+  for (uint32_t i = 0; i < numSamples; i++) {
+    time = (time + 1) % periodSize;
+    float val = time >= halfPeriodSize ? .1 : -.1;
+    for (uint32_t c = 0; c < channelCount; ++c)
+    {
+      *(dst++) = val;
     }
   }
 }
 
-void SquareElement::postOffEvent() {
-  offSample = sampleCount;
-  off = true;
-  releaseAmp = curAmp();
+void SquareElement::noteOnEvent(unsigned char note, unsigned char ) {
+  float freq = midiNoteToFreq(note);
+  periodSize = (uint32_t)sampleRateHz / freq;
+  noteIsHeld = true;
+  shouldPlay = true;
+}
+
+void SquareElement::noteOffEvent(unsigned char ) {
+  noteIsHeld = false;
+  if (!sustainIsHeld)
+  {
+    shouldPlay = false;
+  }
+}
+
+void SquareElement::sustainOnEvent() {
+  sustainIsHeld = true;
+}
+
+void SquareElement::sustainOffEvent() {
+  sustainIsHeld = false;
+  if (!noteIsHeld)
+  {
+    shouldPlay = false;
+  }
 }

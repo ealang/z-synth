@@ -78,7 +78,12 @@ void PolyphonyElement::injectMidi(Rx::observable<const snd_seq_event_t*> midi)
   }
 }
 
-Rx::observable<const snd_seq_event_t*> PolyphonyElement::voiceEvents(uint32_t voiceNumber) const
+Rx::observable<const snd_seq_event_t*> PolyphonyElement::voiceChannel(uint32_t voiceNumber) const
 {
   return subjects[voiceNumber].get_observable();
+}
+
+uint32_t PolyphonyElement::polyphonyCount() const
+{
+  return polyphony;
 }
