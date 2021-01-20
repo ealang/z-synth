@@ -1,7 +1,7 @@
 #include <string>
 #include <iostream>
 #include <sstream>
-#include "./midi_tap_element.h"
+#include "./midi_tap.h"
 #include "../synth_utils/midi_filters.h"
 
 using namespace std;
@@ -50,8 +50,8 @@ static string dumpControl(snd_seq_ev_ctrl_t* data) {
   return s.str();
 }
 
-void MidiTapElement::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
-  sub = midi
+Rx::subscription midiTapSubscription(Rx::observable<const snd_seq_event_t*> midi) {
+  return midi
     | Rx::subscribe<const snd_seq_event_t*>([](const snd_seq_event_t* event) {
         switch (event->type) {
           case SND_SEQ_EVENT_NOTEON:
@@ -80,8 +80,4 @@ void MidiTapElement::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
             break;
         }
       });
-}
-
-MidiTapElement::~MidiTapElement() {
-  sub.unsubscribe();
 }

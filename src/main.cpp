@@ -7,10 +7,10 @@
 #include "./alsa/loops.h"
 
 #include "./cli.h"
-#include "./elements/midi_tap_element.h"
 #include "./metric.h"
 #include "./replica_synth.h"
 #include "./synth_utils/midi_filters.h"
+#include "./synth_utils/midi_tap.h"
 
 using namespace std;
 
@@ -21,9 +21,9 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
   auto channelMidi = midiSubject.get_observable() |
     Rx::filter(channelFilter(0));
 
-  MidiTapElement tap;
+  Rx::subscription tapSub;
   if (cliParams.dumpMidi) {
-    tap.injectMidi(channelMidi);
+    tapSub = midiTapSubscription(channelMidi);
   }
 
   ReplicaSynth synth(params, channelMidi);
@@ -64,6 +64,7 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
 
   audioThread.join();
   midiThread.join();
+  tapSub.unsubscribe();
 }
 
 int main(int argc, char *argv[]) {
