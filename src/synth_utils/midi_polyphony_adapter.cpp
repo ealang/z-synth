@@ -1,10 +1,9 @@
-#include "./polyphony_element.h"
-#include "../synth_utils/build_midi_event.h"
+#include "./midi_polyphony_adapter.h"
 #include "../synth_utils/midi_filters.h"
 
 using namespace std;
 
-PolyphonyElement::PolyphonyElement(
+MidiPolyphonyAdapter::MidiPolyphonyAdapter(
   uint32_t polyphony
 ): polyphony(polyphony) {
 
@@ -20,14 +19,15 @@ PolyphonyElement::PolyphonyElement(
   }
 }
 
-PolyphonyElement::~PolyphonyElement() {
+MidiPolyphonyAdapter::~MidiPolyphonyAdapter() {
   for (auto sub: subs) {
     sub.unsubscribe();
   }
 }
 
-void PolyphonyElement::sustainNoteOnEvent(unsigned char note, unsigned char vel)
+void MidiPolyphonyAdapter::noteOnEvent(const snd_seq_event_t* event)
 {
+  unsigned char note = event->data.note.note;
   uint32_t voice_id = lru_voices.back();
   lru_voices.pop_back();
   lru_voices.insert(lru_voices.begin(), voice_id);
@@ -36,20 +36,17 @@ void PolyphonyElement::sustainNoteOnEvent(unsigned char note, unsigned char vel)
   if (cur_note_id != 0)
   {
     note_to_voice.erase(cur_note_id);
-
-    const auto event = buildNoteOffEvent(cur_note_id);
-    subject_subscribers[voice_id].on_next(&event);
   }
 
   voice_to_note[voice_id] = note;
   note_to_voice[note] = voice_id;
 
-  const auto event = buildNoteOnEvent(note, vel);
-  subject_subscribers[voice_id].on_next(&event);
+  subject_subscribers[voice_id].on_next(event);
 }
 
-void PolyphonyElement::sustainNoteOffEvent(unsigned char note)
+void MidiPolyphonyAdapter::noteOffEvent(const snd_seq_event_t* event)
 {
+  unsigned char note = event->data.note.note;
   const auto it = note_to_voice.find(note);
   if (it != note_to_voice.cend())
   {
@@ -58,14 +55,13 @@ void PolyphonyElement::sustainNoteOffEvent(unsigned char note)
 
     voice_to_note[voice_id] = 0;
 
-    const auto event = buildNoteOffEvent(note);
-    subject_subscribers[voice_id].on_next(&event);
+    subject_subscribers[voice_id].on_next(event);
   }
 }
 
-void PolyphonyElement::injectMidi(Rx::observable<const snd_seq_event_t*> midi)
+void MidiPolyphonyAdapter::injectMidi(Rx::observable<const snd_seq_event_t*> midi)
 {
-  SustainAdapter::injectMidi(midi);
+  NoteListener::injectMidi(midi);
   auto notNotes = midi | Rx::filter([](const snd_seq_event_t* event) {
       return !noteFilter(event);
   });
@@ -78,12 +74,12 @@ void PolyphonyElement::injectMidi(Rx::observable<const snd_seq_event_t*> midi)
   }
 }
 
-Rx::observable<const snd_seq_event_t*> PolyphonyElement::voiceChannel(uint32_t voiceNumber) const
+Rx::observable<const snd_seq_event_t*> MidiPolyphonyAdapter::voiceChannel(uint32_t voiceNumber) const
 {
   return subjects[voiceNumber].get_observable();
 }
 
-uint32_t PolyphonyElement::polyphonyCount() const
+uint32_t MidiPolyphonyAdapter::polyphonyCount() const
 {
   return polyphony;
 }

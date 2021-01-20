@@ -1,13 +1,14 @@
-#ifndef POLYPHONY_ELEMENT_H
-#define POLYPHONY_ELEMENT_H
+#ifndef POLYPHONY_ADAPTER_H
+#define POLYPHONY_ADAPTER_H
 
 #include <cstdint> 
 #include <vector>
+#include <unordered_map>
 
-#include "../synth_utils/sustain_adapter.h"
+#include "./note_listener.h"
 
-// Create a per-voice midi event stream.
-class PolyphonyElement: public SustainAdapter {
+// Expose a per-voice midi event stream.
+class MidiPolyphonyAdapter: public NoteListener {
   uint32_t polyphony;
   std::vector<Rx::subscription> subs;
   std::vector<Rx::subject<const snd_seq_event_t*>> subjects;
@@ -17,12 +18,12 @@ class PolyphonyElement: public SustainAdapter {
   std::vector<uint32_t> voice_to_note;
   std::vector<uint32_t> lru_voices;
 
-  void sustainNoteOnEvent(unsigned char note, unsigned char vel) override;
-  void sustainNoteOffEvent(unsigned char note) override;
+  void noteOnEvent(const snd_seq_event_t*) override;
+  void noteOffEvent(const snd_seq_event_t*) override;
 
 public:
-  PolyphonyElement(uint32_t polyphony);
-  ~PolyphonyElement();
+  MidiPolyphonyAdapter(uint32_t polyphony);
+  ~MidiPolyphonyAdapter();
 
   void injectMidi(Rx::observable<const snd_seq_event_t*>) override;
   Rx::observable<const snd_seq_event_t*> voiceChannel(uint32_t voiceNumber) const;

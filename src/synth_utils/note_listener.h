@@ -12,8 +12,12 @@ public:
   void injectMidi(Rx::observable<const snd_seq_event_t*>) override;
 
 protected:
-  virtual void noteOnEvent(unsigned char note, unsigned char vel) = 0;
-  virtual void noteOffEvent(unsigned char note) = 0;
+  virtual void noteOnEvent(unsigned char note, unsigned char vel);
+  virtual void noteOnEvent(const snd_seq_event_t* event);
+
+  virtual void noteOffEvent(unsigned char note);
+  virtual void noteOffEvent(const snd_seq_event_t* event);
+
   virtual void sustainOnEvent();
   virtual void sustainOffEvent();
 };

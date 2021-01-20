@@ -1,18 +1,19 @@
-#include <cstdio>
 #include "./replica_synth.h"
-#include "./pipeline/pipeline_builder.h"
 
 #include "./elements/amp_element.h"
 #include "./elements/distortion_element.h"
 #include "./elements/square_element.h"
-#include "./elements/polyphony_element.h"
+#include "./pipeline/pipeline_builder.h"
+#include "./synth_utils/midi_polyphony_adapter.h"
+
+#include <cstdio>
 
 using namespace std;
 
 static shared_ptr<AudioElement<float>> buildPipeline(
     AudioParams params,
     Rx::observable<const snd_seq_event_t*> globalMidi,
-    shared_ptr<PolyphonyElement> polyphony
+    shared_ptr<MidiPolyphonyAdapter> polyphony
 ) {
   PipelineBuilder<float> builder;
 
@@ -37,7 +38,7 @@ static shared_ptr<AudioElement<float>> buildPipeline(
 }
 
 ReplicaSynth::ReplicaSynth(AudioParams params, Rx::observable<const snd_seq_event_t*> globalMidi)
-  : polyphony(make_shared<PolyphonyElement>(polyphonyCount))
+  : polyphony(make_shared<MidiPolyphonyAdapter>(polyphonyCount))
 {
   polyphony->injectMidi(globalMidi);
   p = buildPipeline(params, globalMidi, polyphony);
