@@ -6,7 +6,7 @@
 /**
  * Control amplitude of an input using a multipier.
  */
-class AmpElement: public MidiAudioElement<float> {
+class AmpElement: public AudioElement<float>, public MidiListener {
   float masterAmp;
   float channelAmp = 1;
   uint32_t channelCount;

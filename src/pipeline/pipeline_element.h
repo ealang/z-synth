@@ -19,8 +19,4 @@ public:
   ) = 0;
 };
 
-template <typename T>
-class MidiAudioElement: public AudioElement<T>, public MidiListener {
-};
-
 #endif

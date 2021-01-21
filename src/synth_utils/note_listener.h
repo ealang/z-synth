@@ -8,7 +8,7 @@ class NoteListener: public MidiListener {
   Rx::subscription sub1, sub2;
 
 public:
-  ~NoteListener();
+  virtual ~NoteListener();
   void injectMidi(Rx::observable<const snd_seq_event_t*>) override;
 
 protected:

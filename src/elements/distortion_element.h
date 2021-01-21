@@ -1,10 +1,10 @@
-#ifndef PRESSURE_DISTORTION_H
-#define PRESSURE_DISTORTION_H
+#ifndef DISTORTION_ELEMENT_H
+#define DISTORTION_ELEMENT_H
 
 #include "../audio_params.h"
 #include "../pipeline/pipeline_element.h"
 
-class DistortionElement: public MidiAudioElement<float> {
+class DistortionElement: public AudioElement<float>, public MidiListener {
   AudioParams params;
   float amount = 0;
   Rx::subscription sub;

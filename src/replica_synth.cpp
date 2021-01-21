@@ -2,49 +2,83 @@
 
 #include "./elements/amp_element.h"
 #include "./elements/distortion_element.h"
+#include "./elements/switch_element.h"
 #include "./elements/square_element.h"
 #include "./pipeline/pipeline_builder.h"
 #include "./synth_utils/midi_polyphony_adapter.h"
 
-#include <cstdio>
-
 using namespace std;
 
-static shared_ptr<AudioElement<float>> buildPipeline(
-    AudioParams params,
-    Rx::observable<const snd_seq_event_t*> globalMidi,
-    shared_ptr<MidiPolyphonyAdapter> polyphony
+// Example core- just a square wave
+shared_ptr<AudioElement<float>> makeSquareCore(
+  const AudioParams &params,
+  Rx::observable<const snd_seq_event_t*> midi
+) {
+  auto squareElem = make_shared<SquareElement>(params.sampleRateHz, params.channelCount);
+  squareElem->injectMidi(midi);
+  return squareElem;
+}
+
+// Example core- embedded pipeline
+shared_ptr<AudioElement<float>> makeDistortionCore(
+  const AudioParams &params,
+  Rx::observable<const snd_seq_event_t*> midi
 ) {
   PipelineBuilder<float> builder;
 
-  for (uint32_t i = 0; i < polyphony->polyphonyCount(); ++i) {
-    auto synth = std::make_shared<SquareElement>(params.sampleRateHz, params.channelCount);
+  auto squareElem = make_shared<SquareElement>(params.sampleRateHz, params.channelCount);
+  squareElem->injectMidi(midi);
 
-    synth->injectMidi(polyphony->voiceChannel(i));
+  auto distElem = make_shared<DistortionElement>(params);
+  distElem->injectMidi(midi);
 
-    char name[20];
-    snprintf(name, sizeof(name), "synth%d", i);
-    builder.registerElem(name, synth);
-    builder.connectElems(name, "amp");
-  }
+  builder.registerElem("square", squareElem);
+  builder.registerElem("dist", distElem);
 
-  auto amp = make_shared<AmpElement>(0.04, params.channelCount);
-  amp->injectMidi(globalMidi);
-  builder.registerElem("amp", amp);
-
-  builder.setOutputElem("amp");
+  builder.connectElems("square", "dist");
+  builder.setOutputElem("dist");
 
   return builder.build(params.bufferSampleCount, params.channelCount);
 }
 
-ReplicaSynth::ReplicaSynth(AudioParams params, Rx::observable<const snd_seq_event_t*> globalMidi)
-  : polyphony(make_shared<MidiPolyphonyAdapter>(polyphonyCount))
-{
-  polyphony->injectMidi(globalMidi);
-  p = buildPipeline(params, globalMidi, polyphony);
+void ReplicaSynth::initPipeline() {
+  PipelineBuilder<float> builder;
+
+  for (uint32_t i = 0; i < polyphony->polyphonyCount(); ++i) {
+     auto core = makeSquareCore(params, polyphony->voiceChannel(i));
+     //auto core = makeDistortionCore(params, polyphony->voiceChannel(i));
+
+    auto switchElement = std::make_shared<SwitchElement>(params.channelCount);
+    switchElement->setCore(core);
+
+    char name[20];
+    snprintf(name, sizeof(name), "switch%d", i);
+    builder.registerElem(name, switchElement);
+    builder.connectElems(name, "amp");
+
+    switchElements.emplace_back(switchElement);
+  }
+
+  builder.registerElem("amp", ampElement);
+  builder.setOutputElem("amp");
+
+  _pipeline = builder.build(params.bufferSampleCount, params.channelCount);
 }
 
-std::shared_ptr<AudioElement<float>> &ReplicaSynth::pipeline()
+ReplicaSynth::ReplicaSynth(AudioParams params)
+  : params(params),
+    polyphony(make_shared<MidiPolyphonyAdapter>(polyphonyCount)),
+    ampElement(make_shared<AmpElement>(0.04, params.channelCount))
 {
-  return p;
+  initPipeline();
+}
+
+std::shared_ptr<AudioElement<float>> ReplicaSynth::pipeline() const
+{
+  return _pipeline;
+}
+
+void ReplicaSynth::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
+  ampElement->injectMidi(midi);
+  polyphony->injectMidi(midi);
 }

@@ -1,7 +1,8 @@
-#include <cstring>
-#include <cmath>
 #include "./distortion_element.h"
 #include "../synth_utils/midi_filters.h"
+
+#include <cstring>
+#include <cmath>
 
 DistortionElement::DistortionElement(AudioParams params):
   params(params) {}

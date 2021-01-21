@@ -26,7 +26,9 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
     tapSub = midiTapSubscription(channelMidi);
   }
 
-  ReplicaSynth synth(params, channelMidi);
+  ReplicaSynth synth(params);
+  synth.injectMidi(channelMidi);
+
   std::shared_ptr<AudioElement<float>> pipeline = synth.pipeline();
 
   int periodsPerSec = params.sampleRateHz / params.bufferSampleCount;
