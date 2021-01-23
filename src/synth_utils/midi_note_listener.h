@@ -1,15 +1,15 @@
-#ifndef NOTE_LISTENER_H
-#define NOTE_LISTENER_H
+#ifndef MIDI_NOTE_LISTENER_H
+#define MIDI_NOTE_LISTENER_H
 
 #include "../rx_include.h"
 #include <alsa/seq_event.h>
 
 /* Provide callbacks for midi note and sustain pedal events. */
-class NoteListener {
+class MidiNoteListener {
   Rx::subscription sub1, sub2;
 
 public:
-  virtual ~NoteListener();
+  virtual ~MidiNoteListener();
 
 protected:
   void injectMidi(Rx::observable<const snd_seq_event_t*>);

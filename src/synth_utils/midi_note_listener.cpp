@@ -1,14 +1,14 @@
-#include "./note_listener.h"
+#include "./midi_note_listener.h"
 #include "./midi_filters.h"
 
 using namespace std;
 
-NoteListener::~NoteListener() {
+MidiNoteListener::~MidiNoteListener() {
   sub1.unsubscribe();
   sub2.unsubscribe();
 }
 
-void NoteListener::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
+void MidiNoteListener::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
   sub1 = midi
     | Rx::filter(noteFilter)
     | Rx::subscribe<const snd_seq_event_t*>(

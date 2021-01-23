@@ -3,7 +3,7 @@
 
 #include "./audio_params.h"
 #include "./pipeline/pipeline_element.h"
-#include "./synth_utils/note_listener.h"
+#include "./synth_utils/midi_note_listener.h"
 #include "./synth_utils/polyphony_partitioning.h"
 
 #include <cstdio>
@@ -16,7 +16,7 @@ class SquareElement;
 class DistortionElement;
 
 // A configuration modeled after a classic synth made polyphonic.
-class ReplicaSynth : public NoteListener {
+class ReplicaSynth : public MidiNoteListener {
   static const uint32_t polyphonyCount = 8;
   const AudioParams params;
   PolyphonyPartitioning polyphonyPartitioning;

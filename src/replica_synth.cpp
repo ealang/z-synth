@@ -62,7 +62,7 @@ std::shared_ptr<AudioElement<float>> ReplicaSynth::pipeline() const
 }
 
 void ReplicaSynth::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
-  NoteListener::injectMidi(midi);
+  MidiNoteListener::injectMidi(midi);
 }
 
 
