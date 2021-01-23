@@ -6,7 +6,7 @@
 
 class DistortionElement: public AudioElement<float> {
   AudioParams params;
-  float amount = 0;
+  float amount = 0.5;
   void onModChanged(uint8_t value);
 public:
   DistortionElement(AudioParams params);

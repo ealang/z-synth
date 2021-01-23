@@ -4,6 +4,7 @@
 #include "./audio_params.h"
 #include "./pipeline/pipeline_element.h"
 #include "./synth_utils/midi_note_listener.h"
+#include "./synth_utils/midi_nrpn_listener.h"
 #include "./synth_utils/polyphony_partitioning.h"
 
 #include <cstdio>
@@ -16,7 +17,7 @@ class SquareElement;
 class DistortionElement;
 
 // A configuration modeled after a classic synth made polyphonic.
-class ReplicaSynth : public MidiNoteListener {
+class ReplicaSynth : public MidiNoteListener, public MidiNRPNListener {
   static const uint32_t polyphonyCount = 8;
   const AudioParams params;
   PolyphonyPartitioning polyphonyPartitioning;
@@ -36,6 +37,11 @@ class ReplicaSynth : public MidiNoteListener {
   void onNoteOffEvent(unsigned char note) override;
   void onSustainOnEvent() override;
   void onSustainOffEvent() override;
+  void onNRPNValueHighChange(
+    unsigned char paramHigh,
+    unsigned char paramLow,
+    unsigned char value
+  ) override;
 
 public:
   ReplicaSynth(AudioParams params);

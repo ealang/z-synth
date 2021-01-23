@@ -63,6 +63,7 @@ std::shared_ptr<AudioElement<float>> ReplicaSynth::pipeline() const
 
 void ReplicaSynth::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
   MidiNoteListener::injectMidi(midi);
+  MidiNRPNListener::injectMidi(midi);
 }
 
 
@@ -87,5 +88,19 @@ void ReplicaSynth::onSustainOnEvent() {
 void ReplicaSynth::onSustainOffEvent() {
   for(const auto &elem: squareElems) {
     elem->sustainOffEvent();
+  }
+}
+
+void ReplicaSynth::onNRPNValueHighChange(
+  unsigned char paramHigh,
+  unsigned char paramLow,
+  unsigned char value
+) {
+  if (paramHigh == 0x13 && paramLow == 0x37) {
+    if (value == 0) {
+      _pipeline = makeWiring1();
+    } else if (value == 1) {
+      _pipeline = makeWiring2();
+    }
   }
 }
