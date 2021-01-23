@@ -38,14 +38,14 @@ void SquareElement::generate(
   }
 }
 
-void SquareElement::noteOnEvent(unsigned char note, unsigned char ) {
+void SquareElement::onNoteOnEvent(unsigned char note, unsigned char) {
   float freq = midiNoteToFreq(note);
   periodSize = (uint32_t)sampleRateHz / freq;
   noteIsHeld = true;
   shouldPlay = true;
 }
 
-void SquareElement::noteOffEvent(unsigned char ) {
+void SquareElement::onNoteOffEvent(unsigned char ) {
   noteIsHeld = false;
   if (!sustainIsHeld)
   {

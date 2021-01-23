@@ -10,17 +10,14 @@ class NoteListener {
 
 public:
   virtual ~NoteListener();
-  void injectMidi(Rx::observable<const snd_seq_event_t*>);
 
 protected:
-  virtual void noteOnEvent(unsigned char note, unsigned char vel);
-  virtual void noteOnEvent(const snd_seq_event_t* event);
+  void injectMidi(Rx::observable<const snd_seq_event_t*>);
 
-  virtual void noteOffEvent(unsigned char note);
-  virtual void noteOffEvent(const snd_seq_event_t* event);
-
-  virtual void sustainOnEvent();
-  virtual void sustainOffEvent();
+  virtual void onNoteOnEvent(unsigned char note, unsigned char vel) = 0;
+  virtual void onNoteOffEvent(unsigned char note) = 0;
+  virtual void onSustainOnEvent() = 0;
+  virtual void onSustainOffEvent() = 0;
 };
 
 #endif

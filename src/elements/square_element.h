@@ -3,9 +3,8 @@
 
 #include <cstdint> 
 #include "../pipeline/pipeline_element.h"
-#include "../synth_utils/note_listener.h"
 
-class SquareElement: public AudioElement<float>, public NoteListener {
+class SquareElement: public AudioElement<float> {
   const uint32_t sampleRateHz;
   const uint32_t channelCount;
   uint32_t time = 0;
@@ -14,13 +13,13 @@ class SquareElement: public AudioElement<float>, public NoteListener {
   bool shouldPlay = false;
   uint32_t periodSize = 0;
 
-  void noteOnEvent(unsigned char note, unsigned char vel) override;
-  void noteOffEvent(unsigned char note) override;
-  void sustainOnEvent() override;
-  void sustainOffEvent() override;
-
 public:
   SquareElement(uint32_t sampleRateHz, uint32_t channelCount);
+
+  void onNoteOnEvent(unsigned char note, unsigned char vel);
+  void onNoteOffEvent(unsigned char note);
+  void sustainOnEvent();
+  void sustainOffEvent();
 
   uint32_t maxInputs() override;
 

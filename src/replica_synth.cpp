@@ -4,14 +4,13 @@
 #include "./elements/distortion_element.h"
 #include "./elements/square_element.h"
 #include "./pipeline/pipeline_builder.h"
-#include "./synth_utils/midi_polyphony_adapter.h"
 
 using namespace std;
 
 shared_ptr<AudioElement<float>> ReplicaSynth::makeWiring1() const {
   PipelineBuilder<float> builder;
 
-  for (uint32_t i = 0; i < polyphony->polyphonyCount(); ++i) {
+  for (uint32_t i = 0; i < polyphonyCount; ++i) {
     char name[20];
     snprintf(name, sizeof(name), "square%d", i);
     builder.registerElem(name, squareElems[i]);
@@ -27,7 +26,7 @@ shared_ptr<AudioElement<float>> ReplicaSynth::makeWiring1() const {
 shared_ptr<AudioElement<float>> ReplicaSynth::makeWiring2() const {
   PipelineBuilder<float> builder;
 
-  for (uint32_t i = 0; i < polyphony->polyphonyCount(); ++i) {
+  for (uint32_t i = 0; i < polyphonyCount; ++i) {
     char name[20];
     snprintf(name, sizeof(name), "square%d", i);
     builder.registerElem(name, squareElems[i]);
@@ -45,13 +44,12 @@ shared_ptr<AudioElement<float>> ReplicaSynth::makeWiring2() const {
 
 ReplicaSynth::ReplicaSynth(AudioParams params)
   : params(params),
-    polyphony(make_shared<MidiPolyphonyAdapter>(polyphonyCount)),
+    polyphonyPartitioning(polyphonyCount),
     ampElement(make_shared<AmpElement>(0.1, params.channelCount)),
     distElement(make_shared<DistortionElement>(params))
 {
-  for (uint32_t i = 0; i < polyphony->polyphonyCount(); ++i) {
+  for (uint32_t i = 0; i < polyphonyCount; ++i) {
     auto squareElem = make_shared<SquareElement>(params.sampleRateHz, params.channelCount);
-    squareElem->injectMidi(polyphony->voiceChannel(i));
     squareElems.emplace_back(squareElem);
   }
 
@@ -64,5 +62,30 @@ std::shared_ptr<AudioElement<float>> ReplicaSynth::pipeline() const
 }
 
 void ReplicaSynth::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
-  polyphony->injectMidi(midi);
+  NoteListener::injectMidi(midi);
+}
+
+
+void ReplicaSynth::onNoteOnEvent(unsigned char note, unsigned char velocity) {
+  uint32_t voice = polyphonyPartitioning.onNoteOnEvent(note);
+  squareElems[voice]->onNoteOnEvent(note, velocity);
+}
+
+void ReplicaSynth::onNoteOffEvent(unsigned char note) {
+  uint32_t voice = polyphonyPartitioning.onNoteOffEvent(note);
+  if (voice < polyphonyCount) {
+    squareElems[voice]->onNoteOffEvent(note);
+  }
+}
+
+void ReplicaSynth::onSustainOnEvent() {
+  for(const auto &elem: squareElems) {
+    elem->sustainOnEvent();
+  }
+}
+
+void ReplicaSynth::onSustainOffEvent() {
+  for(const auto &elem: squareElems) {
+    elem->sustainOffEvent();
+  }
 }
