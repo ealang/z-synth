@@ -39,6 +39,18 @@ static string dumpControl(snd_seq_ev_ctrl_t* data) {
       break;
     case MIDI_PARAM_DECAY_TIME:
       known = "(decay time)";
+      break;
+    case MIDI_PARAM_NRPN_MSB:
+      known = "(NRPN MSB)";
+      break;
+    case MIDI_PARAM_NRPN_LSB:
+      known = "(NRPN LSB)";
+      break;
+    case MIDI_PARAM_DATA_MSB:
+      known = "(data entry MSB)";
+      break;
+    case MIDI_PARAM_DATA_LSB:
+      known = "(data entry LSB)";
   }
 
   ostringstream s;

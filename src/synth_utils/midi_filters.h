@@ -16,6 +16,7 @@ std::function<bool(const snd_seq_event_t*)> controlFilter(uint32_t param);
 // return value of the control message
 int controlMap(const snd_seq_event_t* event);
 
+// Control change message numbers
 #define MIDI_PARAM_MOD_WHEEL 1
 #define MIDI_PARAM_CHANNEL_VOLUME 7
 #define MIDI_PARAM_SUSTAIN 64
@@ -23,5 +24,9 @@ int controlMap(const snd_seq_event_t* event);
 #define MIDI_PARAM_ATTACK_TIME 73
 #define MIDI_PARAM_BRIGHTNESS 74
 #define MIDI_PARAM_DECAY_TIME 75
+#define MIDI_PARAM_NRPN_MSB 99
+#define MIDI_PARAM_NRPN_LSB 98
+#define MIDI_PARAM_DATA_MSB 6
+#define MIDI_PARAM_DATA_LSB 38
 
 #endif
