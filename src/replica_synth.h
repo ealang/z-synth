@@ -15,7 +15,7 @@ class SquareElement;
 class DistortionElement;
 
 // A configuration modeled after a classic synth made polyphonic.
-class ReplicaSynth : public MidiListener {
+class ReplicaSynth {
   static const uint32_t polyphonyCount = 8;
   const AudioParams params;
 
@@ -31,7 +31,7 @@ class ReplicaSynth : public MidiListener {
 
   public:
     ReplicaSynth(AudioParams params);
-    void injectMidi(Rx::observable<const snd_seq_event_t*>) override;
+    void injectMidi(Rx::observable<const snd_seq_event_t*>);
 
     std::shared_ptr<AudioElement<float>> pipeline() const;
 };

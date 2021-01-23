@@ -1,22 +1,8 @@
 #include <cstring>
 #include "./amp_element.h"
-#include "../synth_utils/midi_filters.h"
 
 AmpElement::AmpElement(float masterAmp, uint32_t channelCount):
   masterAmp(masterAmp), channelCount(channelCount) {
-}
-
-AmpElement::~AmpElement() {
-  sub.unsubscribe();
-}
-
-void AmpElement::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
-  sub = midi
-    | Rx::filter(controlFilter(MIDI_PARAM_CHANNEL_VOLUME))
-    | Rx::map(controlMap)
-    | Rx::subscribe<int>([this](int value) {
-        channelAmp = value / 127.;
-      });
 }
 
 uint32_t AmpElement::maxInputs() {

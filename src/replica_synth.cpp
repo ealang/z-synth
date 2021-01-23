@@ -46,7 +46,7 @@ shared_ptr<AudioElement<float>> ReplicaSynth::makeWiring2() const {
 ReplicaSynth::ReplicaSynth(AudioParams params)
   : params(params),
     polyphony(make_shared<MidiPolyphonyAdapter>(polyphonyCount)),
-    ampElement(make_shared<AmpElement>(0.04, params.channelCount)),
+    ampElement(make_shared<AmpElement>(0.1, params.channelCount)),
     distElement(make_shared<DistortionElement>(params))
 {
   for (uint32_t i = 0; i < polyphony->polyphonyCount(); ++i) {
@@ -64,7 +64,5 @@ std::shared_ptr<AudioElement<float>> ReplicaSynth::pipeline() const
 }
 
 void ReplicaSynth::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
-  ampElement->injectMidi(midi);
-  distElement->injectMidi(midi);
   polyphony->injectMidi(midi);
 }

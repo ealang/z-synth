@@ -1,24 +1,10 @@
 #include "./distortion_element.h"
-#include "../synth_utils/midi_filters.h"
 
 #include <cstring>
 #include <cmath>
 
 DistortionElement::DistortionElement(AudioParams params):
   params(params) {}
-
-void DistortionElement::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
-  sub = midi
-    | Rx::filter(controlFilter(MIDI_PARAM_MOD_WHEEL))
-    | Rx::map(controlMap)
-    | Rx::subscribe<int>([this](int value) {
-        onModChanged(value);
-      });
-}
-
-DistortionElement::~DistortionElement() {
-  sub.unsubscribe();
-}
 
 uint32_t DistortionElement::maxInputs() {
   return 1;

@@ -2,7 +2,6 @@
 #define PIPELINE_ELEMENT_H
 
 #include <cstdint>
-#include "./midi_listener.h"
 
 template <typename T>
 using inputs_t = const T* const *;

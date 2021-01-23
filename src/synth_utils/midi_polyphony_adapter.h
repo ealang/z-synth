@@ -25,7 +25,7 @@ public:
   MidiPolyphonyAdapter(uint32_t polyphony);
   ~MidiPolyphonyAdapter();
 
-  void injectMidi(Rx::observable<const snd_seq_event_t*>) override;
+  void injectMidi(Rx::observable<const snd_seq_event_t*>);
   Rx::observable<const snd_seq_event_t*> voiceChannel(uint32_t voiceNumber) const;
   uint32_t polyphonyCount() const;
 };
