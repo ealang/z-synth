@@ -29,8 +29,6 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
   ReplicaSynth synth(params);
   synth.injectMidi(channelMidi);
 
-  std::shared_ptr<AudioElement<float>> pipeline = synth.pipeline();
-
   int periodsPerSec = params.sampleRateHz / params.bufferSampleCount;
   int metricSeconds = 10;
   Metric audioLatency(periodsPerSec * metricSeconds);
@@ -43,7 +41,7 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
     lock_guard<mutex> guard(lock);
     {
       TimeMetricRAII time(audioLatency);
-      pipeline->generate(params.bufferSampleCount, buffer, 0, nullptr);
+      synth.pipeline()->generate(params.bufferSampleCount, buffer, 0, nullptr);
     }
 
     i += 1;
