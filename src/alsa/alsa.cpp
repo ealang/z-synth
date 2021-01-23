@@ -185,7 +185,7 @@ pair<snd_pcm_t*, AudioParams> openAudioDevice(const CLIParams& cliParams) {
 
   printf(
     "Buffer size: %d frames\n"
-    "Period size %d frames\n",
+    "Period size: %d frames\n",
     (int)bufferSize,
     (int)periodSize
   );
