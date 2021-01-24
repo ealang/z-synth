@@ -41,8 +41,7 @@ public:
 /* Run the pipeline on a single sample. */
 int runPipeline(PipelineBuilder<int>& builder) {
   uint32_t numSamples = 1;
-  uint32_t channelCount = 1;
-  shared_ptr<AudioElement<int>> pipeline = builder.build(numSamples, channelCount);
+  shared_ptr<AudioElement<int>> pipeline = builder.build(numSamples);
 
   uint32_t numInputs = 1;
   inputs_t<int> inBuffers = nullptr;

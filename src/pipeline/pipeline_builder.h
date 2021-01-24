@@ -40,10 +40,9 @@ public:
     outputElem = name;
   }
 
-  std::shared_ptr<AudioElement<T>> build(uint32_t bufferSize, uint32_t channelCount) {
+  std::shared_ptr<AudioElement<T>> build(uint32_t bufferSize) {
     auto pipeline = std::make_shared<Pipeline<T>>(
       bufferSize,
-      channelCount,
       audioElems,
       outputElem,
       connections

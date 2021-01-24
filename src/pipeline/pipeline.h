@@ -32,7 +32,6 @@ class Pipeline: public AudioElement<T> {
   public:
   Pipeline(
     uint32_t bufferSize,
-    uint32_t channelCount,
     std::unordered_map<std::string, std::shared_ptr<AudioElement<T>>> audioElems,
     std::string outputName,
     connections_t connections
@@ -58,7 +57,7 @@ class Pipeline: public AudioElement<T> {
     }
 
     uint32_t numBuffers = countBuffersInPlan(plan);
-    buffer = std::vector<T>(numBuffers * bufferSize * channelCount);
+    buffer = std::vector<T>(numBuffers * bufferSize);
 
     uint32_t stepIndex = 0;
     for (auto step: plan) {
@@ -84,14 +83,14 @@ class Pipeline: public AudioElement<T> {
       std::vector<const T*> ins;
       for (auto bufferNum: inputBuffers) {
         ins.push_back(
-          buffer.data() + bufferNum * bufferSize * channelCount
+          buffer.data() + bufferNum * bufferSize
         );
       }
 
       steps.push_back(ExecutionStep<T> {
         audioElems[name],
         ins,
-        buffer.data() + outputBuffer * bufferSize * channelCount
+        buffer.data() + outputBuffer * bufferSize
       });
       stepIndex++;
     }

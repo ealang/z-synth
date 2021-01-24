@@ -8,10 +8,8 @@
  */
 class AmpElement: public AudioElement<float> {
   float masterAmp;
-  float channelAmp = 1;
-  uint32_t channelCount;
 public:
-  AmpElement(float masterAmp, uint32_t channelCount);
+  AmpElement(float masterAmp);
   uint32_t maxInputs() override;
   void generate(uint32_t numSamples, float* out, uint32_t numInputs, inputs_t<float> inputs) override;
 };

@@ -1,7 +1,6 @@
 #ifndef SQUARE_ELEMENT_H
 #define SQUARE_ELEMENT_H
 
-#include "../audio_params.h"
 #include "../pipeline/pipeline_element.h"
 #include "../synth_utils/monophonic_note_receiver.h"
 
@@ -10,7 +9,6 @@
 
 class GeneratorElement: public AudioElement<float>, public MonophonicNoteReceiver {
   const uint32_t sampleRateHz;
-  const uint32_t channelCount;
   std::function<float(uint32_t, uint32_t)> value;
 
   bool shouldPlay = false;
@@ -21,7 +19,7 @@ class GeneratorElement: public AudioElement<float>, public MonophonicNoteReceive
   void onVirtualNoteOffEvent() override;
 
 public:
-  GeneratorElement(AudioParams params, std::function<float(uint32_t, uint32_t)> value);
+  GeneratorElement(uint32_t sampleRateHz, std::function<float(uint32_t, uint32_t)> value);
 
   uint32_t maxInputs() override;
 

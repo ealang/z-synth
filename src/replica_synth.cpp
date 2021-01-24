@@ -21,17 +21,17 @@ shared_ptr<AudioElement<float>> ReplicaSynth::makeWiring() const {
   builder.registerElem("amp", ampElement);
   builder.setOutputElem("amp");
 
-  return builder.build(params.bufferSampleCount, params.channelCount);
+  return builder.build(params.bufferSampleCount);
 }
 
 ReplicaSynth::ReplicaSynth(AudioParams params)
   : params(params),
     polyphonyPartitioning(polyphonyCount),
-    ampElement(make_shared<AmpElement>(0.1, params.channelCount)),
-    distElement(make_shared<DistortionElement>(params))
+    ampElement(make_shared<AmpElement>(0.1)),
+    distElement(make_shared<DistortionElement>())
 {
   for (uint32_t i = 0; i < polyphonyCount; ++i) {
-    auto squareElem = make_shared<GeneratorElement>(params, sine_function);
+    auto squareElem = make_shared<GeneratorElement>(params.sampleRateHz, sine_function);
     genElements.emplace_back(squareElem);
   }
 

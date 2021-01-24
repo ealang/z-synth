@@ -1,5 +1,8 @@
 #include "./filter_element.h"
 
+#include <cstring>
+#include <vector>
+
 using namespace std;
 
 static const float pullDown = 0.999;
@@ -28,11 +31,8 @@ public:
   }
 };
 
-FilterElement::FilterElement(uint32_t length, uint32_t channelCount)
-  : channelCount(channelCount) {
-    for (uint32_t c = 0; c < channelCount; ++c) {
-      averagers.push_back(make_shared<RollingAverage>(length));
-    }
+FilterElement::FilterElement(uint32_t length)
+  : averager(make_shared<RollingAverage>(length)) {
 }
 
 uint32_t FilterElement::maxInputs() {
@@ -42,8 +42,10 @@ uint32_t FilterElement::maxInputs() {
 void FilterElement::generate(uint32_t numSamples, float* out, uint32_t numInputs, inputs_t<float> inputs) {
   if (numInputs > 0) {
     const float* input = inputs[0];
-    for (uint32_t i = 0; i < numSamples * channelCount; i++) {
-      out[i] = averagers[i % channelCount]->next(input[i]);
+    for (uint32_t i = 0; i < numSamples; i++) {
+      *(out++) = averager->next(*(input++));
     }
+  } else {
+    memset(out, 0, numSamples * sizeof(float));
   }
 }

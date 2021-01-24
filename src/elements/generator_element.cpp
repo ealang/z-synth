@@ -4,9 +4,8 @@
 
 using namespace std;
 
-GeneratorElement::GeneratorElement(AudioParams params, function<float(uint32_t, uint32_t)> value)
-  : sampleRateHz(params.sampleRateHz),
-    channelCount(params.channelCount),
+GeneratorElement::GeneratorElement(uint32_t sampleRateHz, function<float(uint32_t, uint32_t)> value)
+  : sampleRateHz(sampleRateHz),
     value(value) {}
 
 uint32_t GeneratorElement::maxInputs() {
@@ -20,19 +19,14 @@ void GeneratorElement::generate(
   inputs_t<float>
 ) {
   if (!shouldPlay) {
-    uint32_t channelSize = numSamples * sizeof(float);
-    memset(out, 0, channelSize * channelCount);
+    memset(out, 0, numSamples * sizeof(float));
     return;
   }
 
-  float *dst = out;
   for (uint32_t i = 0; i < numSamples; i++) {
     time = (time + 1) % periodSize;
     float val = value(time, periodSize) * 0.1;
-    for (uint32_t c = 0; c < channelCount; ++c)
-    {
-      *(dst++) = val;
-    }
+    *(out++) = val;
   }
 }
 
