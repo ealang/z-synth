@@ -13,7 +13,7 @@
 
 class MidiPolyphonyAdapter;
 class AmpElement;
-class SquareElement;
+class GeneratorElement;
 class DistortionElement;
 
 // A configuration modeled after a classic synth made polyphonic.
@@ -24,14 +24,13 @@ class ReplicaSynth : public MidiNoteListener, public MidiNRPNListener {
 
   // elements
   std::shared_ptr<AmpElement> ampElement;
-  std::vector<std::shared_ptr<SquareElement>> squareElems;
+  std::vector<std::shared_ptr<GeneratorElement>> genElements;
   std::shared_ptr<DistortionElement> distElement;
 
   // logical element/wiring
   std::shared_ptr<AudioElement<float>> _pipeline;
 
-  std::shared_ptr<AudioElement<float>> makeWiring1() const;
-  std::shared_ptr<AudioElement<float>> makeWiring2() const;
+  std::shared_ptr<AudioElement<float>> makeWiring() const;
 
   void onNoteOnEvent(unsigned char note, unsigned char vel) override;
   void onNoteOffEvent(unsigned char note) override;

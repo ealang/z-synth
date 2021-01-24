@@ -2,42 +2,24 @@
 
 #include "./elements/amp_element.h"
 #include "./elements/distortion_element.h"
-#include "./elements/square_element.h"
+#include "./elements/generator_element.h"
+#include "./synth_utils/generator_functions.h"
 #include "./pipeline/pipeline_builder.h"
 
 using namespace std;
 
-shared_ptr<AudioElement<float>> ReplicaSynth::makeWiring1() const {
+shared_ptr<AudioElement<float>> ReplicaSynth::makeWiring() const {
   PipelineBuilder<float> builder;
 
   for (uint32_t i = 0; i < polyphonyCount; ++i) {
     char name[20];
     snprintf(name, sizeof(name), "square%d", i);
-    builder.registerElem(name, squareElems[i]);
+    builder.registerElem(name, genElements[i]);
     builder.connectElems(name, "amp");
   }
 
   builder.registerElem("amp", ampElement);
   builder.setOutputElem("amp");
-
-  return builder.build(params.bufferSampleCount, params.channelCount);
-}
-
-shared_ptr<AudioElement<float>> ReplicaSynth::makeWiring2() const {
-  PipelineBuilder<float> builder;
-
-  for (uint32_t i = 0; i < polyphonyCount; ++i) {
-    char name[20];
-    snprintf(name, sizeof(name), "square%d", i);
-    builder.registerElem(name, squareElems[i]);
-    builder.connectElems(name, "amp");
-  }
-
-  builder.registerElem("amp", ampElement);
-  builder.registerElem("dist", distElement);
-
-  builder.connectElems("amp", "dist");
-  builder.setOutputElem("dist");
 
   return builder.build(params.bufferSampleCount, params.channelCount);
 }
@@ -49,11 +31,11 @@ ReplicaSynth::ReplicaSynth(AudioParams params)
     distElement(make_shared<DistortionElement>(params))
 {
   for (uint32_t i = 0; i < polyphonyCount; ++i) {
-    auto squareElem = make_shared<SquareElement>(params.sampleRateHz, params.channelCount);
-    squareElems.emplace_back(squareElem);
+    auto squareElem = make_shared<GeneratorElement>(params, sine_function);
+    genElements.emplace_back(squareElem);
   }
 
-  _pipeline = makeWiring1();
+  _pipeline = makeWiring();
 }
 
 std::shared_ptr<AudioElement<float>> ReplicaSynth::pipeline() const
@@ -69,38 +51,42 @@ void ReplicaSynth::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
 
 void ReplicaSynth::onNoteOnEvent(unsigned char note, unsigned char velocity) {
   uint32_t voice = polyphonyPartitioning.onNoteOnEvent(note);
-  squareElems[voice]->onNoteOnEvent(note, velocity);
+  genElements[voice]->onNoteOnEvent(note, velocity);
 }
 
 void ReplicaSynth::onNoteOffEvent(unsigned char note) {
   uint32_t voice = polyphonyPartitioning.onNoteOffEvent(note);
   if (voice < polyphonyCount) {
-    squareElems[voice]->onNoteOffEvent(note);
+    genElements[voice]->onNoteOffEvent(note);
   }
 }
 
 void ReplicaSynth::onSustainOnEvent() {
-  for(const auto &elem: squareElems) {
-    elem->sustainOnEvent();
+  for(const auto &elem: genElements) {
+    elem->onSustainOnEvent();
   }
 }
 
 void ReplicaSynth::onSustainOffEvent() {
-  for(const auto &elem: squareElems) {
-    elem->sustainOffEvent();
+  for(const auto &elem: genElements) {
+    elem->onSustainOffEvent();
   }
 }
 
 void ReplicaSynth::onNRPNValueHighChange(
   unsigned char paramHigh,
   unsigned char paramLow,
-  unsigned char value
+  unsigned char paramValue
 ) {
   if (paramHigh == 0x13 && paramLow == 0x37) {
-    if (value == 0) {
-      _pipeline = makeWiring1();
-    } else if (value == 1) {
-      _pipeline = makeWiring2();
+    function<float(uint32_t, uint32_t)> value;
+    if (paramValue == 0) {
+      value = square_function;
+    } else {
+      value = sine_function;
+    }
+    for (auto &elem: genElements) {
+      elem->replaceValue(value);
     }
   }
 }
