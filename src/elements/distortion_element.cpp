@@ -3,12 +3,11 @@
 #include <cstring>
 #include <cmath>
 
+DistortionElement::DistortionElement(float amount)
+  : amount(amount) {}
+
 uint32_t DistortionElement::maxInputs() {
   return 1;
-}
-
-void DistortionElement::onModChanged(uint8_t value) {
-  amount = value/127.;
 }
 
 void DistortionElement::generate(uint32_t numSamples, float* out, uint32_t numInputs, inputs_t<float> inputs) {

@@ -72,7 +72,7 @@ class Pipeline: public AudioElement<T> {
       uint32_t maxInputs = audioElems[name]->maxInputs();
       if (numInputs > maxInputs) {
         std::ostringstream str;
-        str << "Element \"" << outputName << "\" received " << numInputs << " input(s) but supports a max of " << maxInputs;
+        str << "Element \"" << name << "\" received " << numInputs << " input(s) but supports a max of " << maxInputs;
         throw std::runtime_error(str.str());
       }
 

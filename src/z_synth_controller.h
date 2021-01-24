@@ -1,5 +1,5 @@
-#ifndef REPLICA_SYNTH_H
-#define REPLICA_SYNTH_H
+#ifndef Z_SYNTH_CONTROLLER_H
+#define Z_SYNTH_CONTROLLER_H
 
 #include "./audio_params.h"
 #include "./pipeline/pipeline_element.h"
@@ -16,8 +16,8 @@ class AmpElement;
 class GeneratorElement;
 class DistortionElement;
 
-// A configuration modeled after a classic synth made polyphonic.
-class ReplicaSynth : public MidiNoteListener, public MidiNRPNListener {
+// Wire up synth modules & midi events
+class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
   static const uint32_t polyphonyCount = 8;
   const AudioParams params;
   PolyphonyPartitioning polyphonyPartitioning;
@@ -25,6 +25,7 @@ class ReplicaSynth : public MidiNoteListener, public MidiNRPNListener {
   // elements
   std::shared_ptr<AmpElement> ampElement;
   std::vector<std::shared_ptr<GeneratorElement>> genElements;
+  std::shared_ptr<GeneratorElement> lfoElement;
   std::shared_ptr<DistortionElement> distElement;
 
   // logical element/wiring
@@ -43,7 +44,7 @@ class ReplicaSynth : public MidiNoteListener, public MidiNRPNListener {
   ) override;
 
 public:
-  ReplicaSynth(AudioParams params);
+  ZSynthController(AudioParams params);
   void injectMidi(Rx::observable<const snd_seq_event_t*>);
 
   std::shared_ptr<AudioElement<float>> pipeline() const;

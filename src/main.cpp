@@ -8,9 +8,9 @@
 
 #include "./cli.h"
 #include "./metric.h"
-#include "./replica_synth.h"
 #include "./synth_utils/midi_filters.h"
 #include "./synth_utils/midi_tap.h"
+#include "./z_synth_controller.h"
 
 using namespace std;
 
@@ -26,7 +26,7 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
     tapSub = midiTapSubscription(channelMidi);
   }
 
-  ReplicaSynth synth(params);
+  ZSynthController synth(params);
   synth.injectMidi(channelMidi);
 
   int periodsPerSec = params.sampleRateHz / params.bufferSampleCount;
