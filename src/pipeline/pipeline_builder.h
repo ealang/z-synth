@@ -28,12 +28,12 @@ public:
   void registerElem(std::string name, std::shared_ptr<AudioElement<T>> elem) {
     audioElems[name] = elem;
     if (connections.count(name) == 0) {
-      connections.emplace(name, std::set<std::string>());
+      connections.emplace(name, std::vector<std::pair<std::string, uint32_t>>());
     }
   }
 
-  void connectElems(std::string from, std::string to) {
-    connections[from].insert(to);
+  void connectElems(std::string from, std::string to, uint32_t portNumber) {
+    connections[from].emplace_back(to, portNumber);
   }
 
   void setOutputElem(std::string name) {

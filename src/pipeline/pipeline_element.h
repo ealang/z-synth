@@ -9,7 +9,8 @@ using inputs_t = const T* const *;
 template <typename T>
 class AudioElement {
 public:
-  virtual uint32_t maxInputs() = 0;
+  virtual ~AudioElement() {}
+  virtual uint32_t maxInputs() const = 0;
   virtual void generate(
     uint32_t numSamples,
     T* out,

@@ -1,7 +1,6 @@
 #ifndef PIPELINE_H
 #define PIPELINE_H
 
-#include <iostream>
 #include <sstream>
 #include <exception>
 #include <memory>
@@ -32,17 +31,15 @@ class Pipeline: public AudioElement<T> {
   public:
   Pipeline(
     uint32_t bufferSize,
-    std::unordered_map<std::string, std::shared_ptr<AudioElement<T>>> audioElems,
+    const std::unordered_map<std::string, std::shared_ptr<AudioElement<T>>>& audioElems,
     std::string outputName,
-    connections_t connections
+    const connections_t& connections
   ): bufferSize(bufferSize) {
-    plan_t plan = planExecution(connections);
-
     if (audioElems.size() == 0) {
       throw std::runtime_error("No elements were provided");
     }
 
-    for (std::string elemName: allNodes(connections)) {
+    for (const auto& elemName: allNodes(connections)) {
       if (audioElems.count(elemName) == 0) {
         std::ostringstream str;
         str << "Element \"" << elemName << "\" has not been registered";
@@ -50,26 +47,27 @@ class Pipeline: public AudioElement<T> {
       }
     }
 
-    for (std::string elemName: findTerminalNodes(connections)) {
+    for (const auto& elemName: findTerminalNodes(connections)) {
       if (elemName != outputName) {
         std::cerr << "Warning: Element \"" << elemName << "\" has no path to the output" << std::endl;
       }
     }
 
-    uint32_t numBuffers = countBuffersInPlan(plan);
-    buffer = std::vector<T>(numBuffers * bufferSize);
+    const plan_t plan = planExecution(connections);
+    const uint32_t numBuffers = countBuffersInPlan(plan);
+    buffer.resize(numBuffers * bufferSize);
 
     uint32_t stepIndex = 0;
-    for (auto step: plan) {
-      std::string name = std::get<0>(step);
-      std::set<uint32_t> inputBuffers = std::get<1>(step);
+    for (const auto& step: plan) {
+      const std::string& name = std::get<0>(step);
+      const std::vector<uint32_t>& inputBuffers = std::get<1>(step);
       if (name == outputName) {
         outputStep = stepIndex;
       }
-      uint32_t outputBuffer = std::get<2>(step);
+      const uint32_t outputBuffer = std::get<2>(step);
 
-      uint32_t numInputs = inputBuffers.size();
-      uint32_t maxInputs = audioElems[name]->maxInputs();
+      const uint32_t numInputs = inputBuffers.size();
+      const uint32_t maxInputs = audioElems.find(name)->second->maxInputs();
       if (numInputs > maxInputs) {
         std::ostringstream str;
         str << "Element \"" << name << "\" received " << numInputs << " input(s) but supports a max of " << maxInputs;
@@ -81,14 +79,16 @@ class Pipeline: public AudioElement<T> {
       }
 
       std::vector<const T*> ins;
-      for (auto bufferNum: inputBuffers) {
+      for (const auto bufferNum: inputBuffers) {
         ins.push_back(
-          buffer.data() + bufferNum * bufferSize
+          bufferNum == NULL_BUFFER_NUM
+            ? nullptr
+            : buffer.data() + bufferNum * bufferSize
         );
       }
 
       steps.push_back(ExecutionStep<T> {
-        audioElems[name],
+        audioElems.find(name)->second,
         ins,
         buffer.data() + outputBuffer * bufferSize
       });
@@ -102,7 +102,7 @@ class Pipeline: public AudioElement<T> {
     }
   }
 
-  uint32_t maxInputs() override {
+  uint32_t maxInputs() const override {
     return 0;
   }
 

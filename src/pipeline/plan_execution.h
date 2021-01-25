@@ -1,8 +1,4 @@
-/* Take an abstract view of a pipeline as a DAG.
- *
- * Note: ordered sets are being used to make unit tests
- * deterministic.
- */
+/* Take an abstract view of a pipeline as a DAG. */
 #ifndef PLAN_EXECUTION_H
 #define PLAN_EXECUTION_H
 
@@ -12,16 +8,20 @@
 #include <string>
 #include <exception>
 
+const uint32_t NULL_BUFFER_NUM = -1;
+
+// Store a set of directed connections between nodes
 using connections_t = std::unordered_map<
-  std::string,          // from node
-  std::set<std::string> // to nodes
+  std::string,                                  // from node name
+  std::vector<std::pair<std::string, uint32_t>> // to node name, port number
 >;
 
+// Instructions for executing a pipeline
 using plan_t = std::vector<
   std::tuple<
-    std::string,         // node
-    std::set<uint32_t>,  // input buffer numbers
-    uint32_t             // output buffer number
+    std::string,            // node
+    std::vector<uint32_t>,  // input buffer numbers
+    uint32_t                // output buffer number
   >
 >;
 
@@ -36,6 +36,7 @@ std::set<std::string> allNodes(const connections_t& connections);
 /* Given the connections of audio elements, provide the order
  * in which the pipeline needs to be executed, along with named
  * buffers which should be provided as inputs to each element.
+ * NULL_BUFFER_NUM indicates a disconnected input.
  */
 plan_t planExecution(const connections_t& connections);
 

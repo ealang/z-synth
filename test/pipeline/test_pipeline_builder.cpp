@@ -1,5 +1,5 @@
 /**
- * Blackbox tests for pipeline & builder.
+ * Integration tests for pipeline & builder.
  */
 #include <exception>
 #include <memory>
@@ -14,7 +14,7 @@ class ConstElem: public AudioElement<int> {
   int val;
 public:
   ConstElem(int val): val(val) {}
-  uint32_t maxInputs() override { return 0; };
+  uint32_t maxInputs() const override { return 0; };
   void generate(uint32_t numSamples, int* out, uint32_t, inputs_t<int>) override {
     for (uint32_t j = 0; j < numSamples; j++) {
       out[j] = val;
@@ -27,13 +27,32 @@ class SumElem: public AudioElement<int> {
   int add;
 public:
   SumElem(int add): add(add) {}
-  uint32_t maxInputs() override { return -1; };
+  uint32_t maxInputs() const override { return -1; };
   void generate(uint32_t numSamples, int* out, uint32_t numInputs, inputs_t<int> inputs) override {
     for (uint32_t j = 0; j < numSamples; j++) {
       out[j] = add;
       for (uint32_t i = 0; i < numInputs; i++) {
         out[j] += inputs[i][j];
       }
+    }
+  }
+};
+
+/* Sum values giving each port a different weight. */
+class SumWeightedPortsElem: public AudioElement<int> {
+public:
+  uint32_t maxInputs() const override { return -1; };
+  void generate(uint32_t numSamples, int* out, uint32_t numInputs, inputs_t<int> inputs) override {
+    for (uint32_t i = 0; i < numSamples; i++) {
+      int v = 0;
+      int multiplier = 1;
+      for (uint32_t j = 0; j < numInputs; j++) {
+        if (inputs[j] != nullptr) {
+          v += inputs[j][i] * multiplier;
+        }
+        multiplier *= 10;
+      }
+      out[i] = v;
     }
   }
 };
@@ -70,7 +89,7 @@ TEST(PipelineBuilderTest, givenALinearChain_ItBuildsAPipeline) {
   auto builder = PipelineBuilder<int>();
   builder.registerElem("input", make_shared<ConstElem>(42));
   builder.registerElem("add", make_shared<SumElem>(1));
-  builder.connectElems("input", "add");
+  builder.connectElems("input", "add", 0);
   builder.setOutputElem("add");
 
   ASSERT_EQ(runPipeline(builder), 43);
@@ -94,10 +113,50 @@ TEST(PipelineBuilderTest, givenAFanInGraph_ItBuildsAPipeline) {
     "add2",
     make_shared<SumElem>(40)
   );
-  builder.connectElems("input1", "add1");
-  builder.connectElems("input2", "add2");
-  builder.connectElems("add1", "add2");
+  builder.connectElems("input1", "add1", 0);
+  builder.connectElems("input2", "add2", 0);
+  builder.connectElems("add1", "add2", 1);
   builder.setOutputElem("add2");
 
   ASSERT_EQ(runPipeline(builder), 71);
+}
+
+TEST(PipelineBuilderTest, givenElementWithManyPorts_ItAssignsAsExpected) {
+  auto builder = PipelineBuilder<int>();
+  builder.registerElem(
+    "const1",
+    make_shared<ConstElem>(1)
+  );
+  builder.registerElem(
+    "const2",
+    make_shared<ConstElem>(2)
+  );
+  builder.registerElem(
+    "adder",
+    make_shared<SumWeightedPortsElem>()
+  );
+  builder.connectElems("const1", "adder", 0);
+  builder.connectElems("const1", "adder", 3);
+  builder.connectElems("const2", "adder", 4);
+  builder.connectElems("const2", "adder", 6);
+  builder.setOutputElem("adder");
+
+  ASSERT_EQ(runPipeline(builder), 2021001);
+}
+
+TEST(PipelineBuilderTest, givenMoreConnectionsThanInputs_ItThrowsAnException) {
+  auto builder = PipelineBuilder<int>();
+  builder.registerElem("const1", make_shared<ConstElem>(1));
+  builder.registerElem("const2", make_shared<ConstElem>(2));
+  builder.connectElems("const1", "const2", 0);
+  builder.setOutputElem("const2");
+  bool thrown = false;
+  try {
+    runPipeline(builder);
+  } catch (const runtime_error& e) {
+    string msg = e.what();
+    ASSERT_EQ(msg, "Element \"const2\" received 1 input(s) but supports a max of 0");
+    thrown = true;
+  }
+  ASSERT_TRUE(thrown);
 }

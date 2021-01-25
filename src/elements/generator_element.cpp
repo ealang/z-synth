@@ -2,16 +2,18 @@
 #include "../synth_utils/midi_note_to_freq.h"
 #include <string.h>
 
-#include <iostream>
-
 using namespace std;
 
 GeneratorElement::GeneratorElement(uint32_t sampleRateHz, function<float(uint32_t, uint32_t)> value)
   : sampleRateHz(sampleRateHz),
     value(value) {}
 
-uint32_t GeneratorElement::maxInputs() {
+uint32_t GeneratorElement::maxInputs() const {
   return 1;
+}
+
+uint32_t GeneratorElement::fmPortNumber() const {
+  return _fmPortNumber;
 }
 
 void GeneratorElement::generate(
@@ -29,7 +31,7 @@ void GeneratorElement::generate(
   for (uint32_t i = 0; i < numSamples; i++) {
     uint32_t periodSize = numInputs == 0 ?
       targetPeriodSize :
-      ((uint32_t)sampleRateHz / (targetFrequency * (1 +  inputs[0][i] * 0.1f)));
+      ((uint32_t)sampleRateHz / (targetFrequency * (1 +  inputs[_fmPortNumber][i] * 0.1f)));
 
     time = (time + 1) % periodSize;
 

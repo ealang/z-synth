@@ -1,10 +1,12 @@
-#include <stack>
-
 #include "./plan_execution.h"
+
+#include <sstream>
+#include <stack>
 
 using namespace std;
 
 using dependency_map_t = unordered_map<string, set<string>>;
+using nodeport_dependency_map_t = unordered_map<string, unordered_map<string, set<uint32_t>>>;
 
 class BufferPool {
   uint32_t next = 0;
@@ -24,27 +26,27 @@ public:
   }
 };
 
-InvalidConnections::InvalidConnections(std::string msg): runtime_error(msg) {
+InvalidConnections::InvalidConnections(string msg): runtime_error(msg) {
 }
 
 set<string> allNodes(const connections_t& connections) {
   set<string> all;
-  for (auto connection: connections) {
-    all.insert(connection.first);
-    for (auto after: connection.second) {
-      all.insert(after);
+  for (const auto& outgoingConnections: connections) {
+    all.insert(outgoingConnections.first);
+    for (const auto& connection: outgoingConnections.second) {
+      all.insert(get<0>(connection));
     }
   }
   return all;
 }
 
-set<string> dependencyFreeNodes(
+static set<string> dependencyFreeNodes(
   const connections_t& connections,
   dependency_map_t& dependencies
 ) {
   set<string> nodes;
-  for (auto connection: connections) {
-    auto node = connection.first;
+  for (const auto& outgoingConnections: connections) {
+    auto node = outgoingConnections.first;
     if (dependencies[node].size() == 0) {
       nodes.insert(node);
     }
@@ -52,18 +54,33 @@ set<string> dependencyFreeNodes(
   return nodes;
 }
 
-dependency_map_t nodeDependencies(const connections_t& connections) {
+// Lookup node -> dependencies of node
+static dependency_map_t buildNodeDependencyLookup(const connections_t& connections) {
   dependency_map_t dependencies;
-  for (auto connection: connections) {
-    auto node = connection.first;
-    for (auto runAfter: connection.second) {
-      dependencies[runAfter].insert(node);
+  for (const auto& outgoingConnections: connections) {
+    auto node = outgoingConnections.first;
+    for (const auto& connection: outgoingConnections.second) {
+      dependencies[connection.first].insert(node);
     }
   }
   return dependencies;
 }
 
-bool canExecuteNode(string& node, set<string>& executed, dependency_map_t& dependencies) {
+// Lookup node -> dependencies of node -> input port numbers
+static nodeport_dependency_map_t buildNodePortDependencyLookup(const connections_t& connections) {
+  nodeport_dependency_map_t portLookup;
+  for (const auto& outgoingConnections: connections) {
+    const auto fromNode = outgoingConnections.first;
+    for (const auto& connection: outgoingConnections.second) {
+      const auto toNode = connection.first;
+      const auto portNumber = connection.second;
+      portLookup[toNode][fromNode].emplace(portNumber);
+    }
+  }
+  return portLookup;
+}
+
+bool canExecuteNode(const string& node, const set<string>& executed, dependency_map_t& dependencies) {
   for (auto dependency: dependencies[node]) {
     if (executed.count(dependency) == 0) {
       return false;
@@ -72,22 +89,58 @@ bool canExecuteNode(string& node, set<string>& executed, dependency_map_t& depen
   return true;
 }
 
-set<uint32_t> inputBuffersForNode(
-  string& node,
-  dependency_map_t& dependencies,
+// Throw if multiple connections are assigned to the same inbound port.
+static void throwIfHasConflictingPorts(const connections_t& connections) {
+  unordered_map<string, set<uint32_t>> consumedPorts;
+  for (const auto& outgoingConnections: connections) {
+    for (const auto& connection: outgoingConnections.second) {
+      const auto toNode = connection.first;
+      const auto portNumber = connection.second;
+      if (consumedPorts[toNode].count(portNumber) > 0) {
+        ostringstream s;
+        s << "Multiple connections to node " << toNode << " port " << portNumber;
+        throw InvalidConnections(s.str());
+      }
+      consumedPorts[toNode].emplace(portNumber);
+    }
+  }
+}
+
+static vector<uint32_t> inputBuffersForNode(
+  const string& node,
+  nodeport_dependency_map_t& portNumbers,
   unordered_map<string, uint32_t>& outputBuffers
 ) {
-  set<uint32_t> buffers;
-  for (auto inputNode: dependencies[node]) {
-    buffers.insert(outputBuffers[inputNode]);
+  vector<uint32_t> buffers;
+
+  if (portNumbers[node].size() == 0) {
+    return buffers;
   }
+
+  // Find the max port number from any incoming connections
+  uint32_t maxPortNumber = 0;
+  for (const auto& incommingConection: portNumbers[node]) {
+    for (const auto portNumber: incommingConection.second) {
+      maxPortNumber = max(maxPortNumber, portNumber);
+    }
+  }
+
+  // Assign buffers
+  buffers.resize(maxPortNumber + 1, NULL_BUFFER_NUM);
+  for (const auto& incommingConection: portNumbers[node]) {
+    const auto& fromNode = incommingConection.first;
+    for (const auto portNumber: incommingConection.second) {
+      buffers[portNumber] = outputBuffers[fromNode];
+    }
+  }
+
   return buffers;
 }
 
-bool anotherNodeIsWaitingForThisNode(
-  string& node,
+static bool anotherNodeIsWaitingForThisNode(
+  const string& node,
   dependency_map_t& dependencies,
-  set<string>& waitingNodes)
+  const set<string>& waitingNodes)
 {
   for (auto waitingNode: waitingNodes) {
     if (dependencies[waitingNode].count(node) == 1) {
@@ -98,11 +151,14 @@ bool anotherNodeIsWaitingForThisNode(
 }
 
 plan_t planExecution(const connections_t& connections) {
+  throwIfHasConflictingPorts(connections);
+
   plan_t plan;
   BufferPool bufferPool;
   unordered_map<string, uint32_t> outputBuffers;
   set<string> executed, waiting = allNodes(connections);
-  dependency_map_t dependencies = nodeDependencies(connections);
+  auto dependencies = buildNodeDependencyLookup(connections);
+  auto portNumbers = buildNodePortDependencyLookup(connections);
 
   stack<string> toVisit;
   {
@@ -122,19 +178,17 @@ plan_t planExecution(const connections_t& connections) {
       // visit downstream nodes
       auto runAfter = connections.find(node);
       if (runAfter != connections.end()) {
-        for (auto otherNode: runAfter->second) {
-          toVisit.push(otherNode);
+        for (const auto& otherNode: runAfter->second) {
+          toVisit.push(otherNode.first);
         }
       }
 
       // track buffers
-      auto inputBuffers = inputBuffersForNode(node, dependencies, outputBuffers);
+      auto inputBuffers = inputBuffersForNode(node, portNumbers, outputBuffers);
       auto outputBuffer = bufferPool.take();
-      plan.push_back(make_tuple(
-        node, inputBuffers, outputBuffer
-      ));
+      plan.emplace_back(node, inputBuffers, outputBuffer);
       outputBuffers[node] = outputBuffer;
-      for (auto dependency: dependencies[node]) {
+      for (const auto& dependency: dependencies[node]) {
         if (!anotherNodeIsWaitingForThisNode(dependency, dependencies, waiting)) {
           bufferPool.put(outputBuffers[dependency]);
         }
@@ -164,8 +218,7 @@ uint32_t countBuffersInPlan(const plan_t& plan) {
 
 set<string> findTerminalNodes(const connections_t& connections) {
   set<string> terminals;
-
-  for (auto node: allNodes(connections)) {
+  for (const auto &node: allNodes(connections)) {
     auto outs = connections.find(node);
     if (outs == connections.end() || outs->second.size() == 0) {
       terminals.insert(node);

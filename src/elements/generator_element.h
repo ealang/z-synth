@@ -8,6 +8,8 @@
 #include <functional>
 
 class GeneratorElement: public AudioElement<float>, public MonophonicNoteReceiver {
+  const uint32_t _fmPortNumber = 0;
+
   const uint32_t sampleRateHz;
   std::function<float(uint32_t, uint32_t)> value;
   float targetFrequency = 0;
@@ -21,7 +23,9 @@ class GeneratorElement: public AudioElement<float>, public MonophonicNoteReceive
 public:
   GeneratorElement(uint32_t sampleRateHz, std::function<float(uint32_t, uint32_t)> value);
 
-  uint32_t maxInputs() override;
+  uint32_t maxInputs() const override;
+  // Port for frequency modulation
+  uint32_t fmPortNumber() const;
 
   void replaceValue(std::function<float(uint32_t, uint32_t)> newValue) {
     value = newValue;

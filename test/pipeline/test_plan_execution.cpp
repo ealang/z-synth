@@ -18,9 +18,9 @@ TEST(PlanExecutionTest, givenSingleElement_ItPlansExecution) {
 
 TEST(PlanExecutionTest, givenLinearChainOfElements_ItPlansExecution) {
   auto connections = connections_t();
-  connections["a"].insert("b");
-  connections["b"].insert("c");
-  connections["c"].insert("d");
+  connections["a"].emplace_back("b", 0);
+  connections["b"].emplace_back("c", 0);
+  connections["c"].emplace_back("d", 0);
 
   auto plan = planExecution(connections);
   plan_t expected = {
@@ -34,14 +34,14 @@ TEST(PlanExecutionTest, givenLinearChainOfElements_ItPlansExecution) {
 
 TEST(PlanExecutionTest, givenComplexChainOfElements_ItplansExecution) {
   auto connections = connections_t();
-  connections["a"].insert("b");
-  connections["a"].insert("c");
-  connections["a"].insert("f");
-  connections["f"].insert("d");
-  connections["c"].insert("d");
-  connections["d"].insert("e");
-  connections["b"].insert("e");
-  connections["e"].insert("g");
+  connections["a"].emplace_back("b", 0);
+  connections["a"].emplace_back("c", 0);
+  connections["a"].emplace_back("f", 0);
+  connections["f"].emplace_back("d", 0);
+  connections["c"].emplace_back("d", 1);
+  connections["d"].emplace_back("e", 1);
+  connections["b"].emplace_back("e", 0);
+  connections["e"].emplace_back("g", 0);
 
   auto plan = planExecution(connections);
   plan_t expected = {
@@ -56,11 +56,32 @@ TEST(PlanExecutionTest, givenComplexChainOfElements_ItplansExecution) {
   ASSERT_EQ(plan, expected);
 }
 
-TEST(PlanExecutionTest, givenConnectionsWithALoop_ItThrowsException) {
+TEST(PlanExecutionTest, givenSingleElementWithALoop_ItThrowsException) {
   auto connections = connections_t();
-  connections["a"].insert("b");
-  connections["b"].insert("a");
-  connections["c"].insert("a");
+  connections["a"].emplace_back("a", 0);
+
+  ASSERT_THROW(
+    planExecution(connections),
+    InvalidConnections
+  );
+}
+
+TEST(PlanExecutionTest, giveMultipleElementsWithALoop_ItThrowsException) {
+  auto connections = connections_t();
+  connections["a"].emplace_back("b", 0);
+  connections["b"].emplace_back("a", 0);
+  connections["c"].emplace_back("a", 1);
+
+  ASSERT_THROW(
+    planExecution(connections),
+    InvalidConnections
+  );
+}
+
+TEST(PlanExecutionTest, givenConnectionsWithConflictingPorts_ItThrowsException) {
+  auto connections = connections_t();
+  connections["a"].emplace_back("c", 0);
+  connections["b"].emplace_back("c", 0);
 
   ASSERT_THROW(
     planExecution(connections),
@@ -70,10 +91,10 @@ TEST(PlanExecutionTest, givenConnectionsWithALoop_ItThrowsException) {
 
 TEST(PlanExecutionTest, givenAPlan_ItCountsNumberOfBuffersRequired) {
   auto connections = connections_t();
-  connections["a"].insert("c");
-  connections["b"].insert("c");
-  connections["c"].insert("d");
-  connections["d"].insert("e");
+  connections["a"].emplace_back("c", 0);
+  connections["b"].emplace_back("c", 1);
+  connections["c"].emplace_back("d", 0);
+  connections["d"].emplace_back("e", 0);
   auto plan = planExecution(connections);
 
   ASSERT_EQ(countBuffersInPlan(plan), 3);
@@ -82,16 +103,16 @@ TEST(PlanExecutionTest, givenAPlan_ItCountsNumberOfBuffersRequired) {
 TEST(PlanExecutionTest, givenDisconnectedChainsOfElements_ItFindsTheTerminalNodes) {
   connections_t connections = {
     // chain
-    { "comp1_a", { "comp1_b" }},
+    {"comp1_a", {{"comp1_b", 0}}},
     // tree
-    { "comp2_a", { "comp2_b" }},
-    { "comp2_b", { "comp2_d" }},
-    { "comp2_c", { "comp2_b", "comp2_d" }},
+    {"comp2_a", {{"comp2_b", 0}}},
+    {"comp2_b", {{"comp2_d", 0}}},
+    {"comp2_c", {{"comp2_b", 0}, {"comp2_d", 0}}},
     // single node
-    { "comp3_a", {}},
+    {"comp3_a", {}},
     // cycle
-    { "comp4_a", { "comp4_b" }},
-    { "comp4_b", { "comp4_a" }},
+    {"comp4_a", {{"comp4_b", 0}}},
+    {"comp4_b", {{"comp4_a", 0}}},
   };
   set<string> expected = {
     "comp1_b",

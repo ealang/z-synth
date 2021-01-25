@@ -35,13 +35,18 @@ FilterElement::FilterElement(uint32_t length)
   : averager(make_shared<RollingAverage>(length)) {
 }
 
-uint32_t FilterElement::maxInputs() {
+uint32_t FilterElement::maxInputs() const {
   return 1;
+}
+
+
+uint32_t FilterElement::inputPortNumber() const {
+  return _inputPortNumber;
 }
 
 void FilterElement::generate(uint32_t numSamples, float* out, uint32_t numInputs, inputs_t<float> inputs) {
   if (numInputs > 0) {
-    const float* input = inputs[0];
+    const float* input = inputs[_inputPortNumber];
     for (uint32_t i = 0; i < numSamples; i++) {
       *(out++) = averager->next(*(input++));
     }

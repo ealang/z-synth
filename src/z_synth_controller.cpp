@@ -18,12 +18,12 @@ shared_ptr<AudioElement<float>> ZSynthController::makeWiring() const {
     char name[20];
     snprintf(name, sizeof(name), "square%d", i);
     builder.registerElem(name, genElements[i]);
-    builder.connectElems(name, "amp");
-    builder.connectElems("lfo", name);
+    builder.connectElems(name, "amp", ampElement->inputPortNumber(i));
+    builder.connectElems("lfo", name, genElements[i]->fmPortNumber());
   }
 
   builder.registerElem("amp", ampElement);
-  builder.connectElems("amp", "dist");
+  builder.connectElems("amp", "dist", distElement->inputPortNumber());
   builder.setOutputElem("dist");
 
   return builder.build(params.bufferSampleCount);
