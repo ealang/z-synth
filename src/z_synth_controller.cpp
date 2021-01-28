@@ -1,5 +1,6 @@
 #include "./z_synth_controller.h"
 
+#include "./elements/adsr_element.h"
 #include "./elements/amp_element.h"
 #include "./elements/distortion_element.h"
 #include "./elements/generator_element.h"
@@ -15,11 +16,17 @@ shared_ptr<AudioElement<float>> ZSynthController::makeWiring() const {
   builder.registerElem("dist", distElement);
 
   for (uint32_t i = 0; i < polyphonyCount; ++i) {
-    char name[20];
-    snprintf(name, sizeof(name), "square%d", i);
-    builder.registerElem(name, genElements[i]);
-    builder.connectElems(name, "amp", ampElement->inputPortNumber(i));
-    builder.connectElems("lfo", name, genElements[i]->fmPortNumber());
+    char genName[20];
+    snprintf(genName, sizeof(genName), "gen%d", i);
+    builder.registerElem(genName, genElements[i]);
+    builder.connectElems("lfo", genName, genElements[i]->fmPortNumber());
+
+    char adsrName[20];
+    snprintf(adsrName, sizeof(adsrName), "adsr%d", i);
+    builder.registerElem(adsrName, adsrElements[i]);
+
+    builder.connectElems(genName, adsrName, adsrElements[i]->inputPortNumber());
+    builder.connectElems(adsrName, "amp", ampElement->inputPortNumber(i));
   }
 
   builder.registerElem("amp", ampElement);
@@ -39,6 +46,9 @@ ZSynthController::ZSynthController(AudioParams params)
   for (uint32_t i = 0; i < polyphonyCount; ++i) {
     genElements.emplace_back(
       make_shared<GeneratorElement>(params.sampleRateHz, sine_function)
+    );
+    adsrElements.emplace_back(
+      make_shared<ADSRElement>(params.sampleRateHz)
     );
   }
 
@@ -62,12 +72,13 @@ void ZSynthController::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
 void ZSynthController::onNoteOnEvent(unsigned char note, unsigned char velocity) {
   uint32_t voice = polyphonyPartitioning.onNoteOnEvent(note);
   genElements[voice]->onNoteOnEvent(note, velocity);
+  adsrElements[voice]->trigger();
 }
 
 void ZSynthController::onNoteOffEvent(unsigned char note) {
   uint32_t voice = polyphonyPartitioning.onNoteOffEvent(note);
   if (voice < polyphonyCount) {
-    genElements[voice]->onNoteOffEvent(note);
+    adsrElements[voice]->release();
   }
 }
 

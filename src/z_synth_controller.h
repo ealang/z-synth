@@ -15,6 +15,7 @@ class MidiPolyphonyAdapter;
 class AmpElement;
 class GeneratorElement;
 class DistortionElement;
+class ADSRElement;
 
 // Wire up synth modules & midi events
 class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
@@ -25,6 +26,7 @@ class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
   // elements
   std::shared_ptr<AmpElement> ampElement;
   std::vector<std::shared_ptr<GeneratorElement>> genElements;
+  std::vector<std::shared_ptr<ADSRElement>> adsrElements;
   std::shared_ptr<GeneratorElement> lfoElement;
   std::shared_ptr<DistortionElement> distElement;
 

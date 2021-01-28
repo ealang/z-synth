@@ -1,5 +1,5 @@
 MAIN_SRC = $(wildcard src/*.cpp src/elements/*.cpp src/pipeline/*.cpp src/synth_utils/*.cpp src/alsa/*.cpp)
-TEST_SRC = $(wildcard test/pipeline/*.cpp test/synth_utils/*.cpp)
+TEST_SRC = $(wildcard test/pipeline/*.cpp test/synth_utils/*.cpp test/elements/*.cpp)
 
 TO_OBJS = $(patsubst %.cpp, obj/%.o, $(1))
 MAIN_OBJS = $(call TO_OBJS, $(MAIN_SRC))
