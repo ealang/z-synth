@@ -45,12 +45,17 @@ ZSynthController::ZSynthController(AudioParams params)
     distElement(make_shared<DistortionElement>(0.8))
 {
   for (uint32_t i = 0; i < polyphonyCount; ++i) {
-    genElements.emplace_back(
-      make_shared<GeneratorElement>(params.sampleRateHz, sine_function)
-    );
-    adsrElements.emplace_back(
-      make_shared<ADSRElement>(params.sampleRateHz)
-    );
+    auto genElem = make_shared<GeneratorElement>(params.sampleRateHz, sine_function);
+    genElem->setAmplitude(0.1);
+    genElem->setFMLinearRange(5);
+    genElements.emplace_back(genElem);
+
+    auto adsrElem = make_shared<ADSRElement>(params.sampleRateHz);
+    adsrElem->setAttackTime(0.1);
+    adsrElem->setDecayTime(0.1);
+    adsrElem->setSustainLevel(0.8);
+    adsrElem->setReleaseTime(0.3);
+    adsrElements.emplace_back(adsrElem);
   }
 
   lfoElement->setFrequency(4);
@@ -102,14 +107,14 @@ void ZSynthController::onNRPNValueHighChange(
   unsigned char paramValue
 ) {
   if (paramHigh == 0x13 && paramLow == 0x37) {
-    function<float(uint32_t, uint32_t)> value;
+    function<float(float)> value;
     if (paramValue == 0) {
       value = square_function;
     } else {
       value = sine_function;
     }
     for (auto &elem: genElements) {
-      elem->replaceValue(value);
+      elem->setValue(value);
     }
   }
 }

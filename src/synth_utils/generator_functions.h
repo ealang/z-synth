@@ -3,7 +3,7 @@
 
 #include <cstdint> 
 
-float square_function(uint32_t t, uint32_t period);
-float sine_function(uint32_t t, uint32_t period);
+float square_function(float time);
+float sine_function(float time);
 
 #endif

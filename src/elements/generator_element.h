@@ -10,25 +10,29 @@ class GeneratorElement: public AudioElement<float> {
   const uint32_t _fmPortNumber = 0;
 
   const uint32_t sampleRateHz;
-  std::function<float(uint32_t, uint32_t)> value;
-  float targetFrequency = 0;
+  std::function<float(float)> _value;
+  float _frequency = 0;
+  float _amplitude = 1;
+  float _fmRange = 0;
 
-  bool shouldPlay = false;
-  uint32_t time = 0;
+  bool isEnabled = false;
+  float time = 0;
+
+  void generateFrequencyMod(uint32_t numSamples, float *out, const float *in);
+  void generateFixedFrequency(uint32_t numSamples, float *out);
 
 public:
-  GeneratorElement(uint32_t sampleRateHz, std::function<float(uint32_t, uint32_t)> value);
+  GeneratorElement(uint32_t sampleRateHz, std::function<float(float)> value);
 
   uint32_t maxInputs() const override;
   // Port for frequency modulation
   uint32_t fmPortNumber() const;
 
-  void replaceValue(std::function<float(uint32_t, uint32_t)> newValue) {
-    value = newValue;
-  }
-
+  void setValue(std::function<float(float)> value);
   void setFrequency(float frequency);
   void setEnabled(bool state);
+  void setAmplitude(float amplitude);
+  void setFMLinearRange(float frequency);
 
   void generate(
     uint32_t numSamples,

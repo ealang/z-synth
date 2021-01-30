@@ -3,13 +3,13 @@
 
 #define PI2 (2 * 3.14159265)
 
-float square_function(uint32_t t, uint32_t period) {
-  if (t >= (period >> 2)) {
+float square_function(float time) {
+  if (time > 0.5) {
     return 1;
   }
   return -1;
 }
 
-float sine_function(uint32_t t, uint32_t period) {
-  return sin((float)t / period * PI2);
+float sine_function(float time) {
+  return sin(time * PI2);
 }
