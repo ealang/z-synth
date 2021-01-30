@@ -5,6 +5,7 @@
 #include "./elements/distortion_element.h"
 #include "./elements/generator_element.h"
 #include "./synth_utils/generator_functions.h"
+#include "./synth_utils/midi_note_to_freq.h"
 #include "./pipeline/pipeline_builder.h"
 
 using namespace std;
@@ -69,9 +70,10 @@ void ZSynthController::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
 }
 
 
-void ZSynthController::onNoteOnEvent(unsigned char note, unsigned char velocity) {
+void ZSynthController::onNoteOnEvent(unsigned char note, unsigned char) {
   uint32_t voice = polyphonyPartitioning.onNoteOnEvent(note);
-  genElements[voice]->onNoteOnEvent(note, velocity);
+  genElements[voice]->setFrequency(midiNoteToFreq(note));
+  genElements[voice]->setEnabled(true);
   adsrElements[voice]->trigger();
 }
 
@@ -83,14 +85,14 @@ void ZSynthController::onNoteOffEvent(unsigned char note) {
 }
 
 void ZSynthController::onSustainOnEvent() {
-  for(const auto &elem: genElements) {
-    elem->onSustainOnEvent();
-  }
+  polyphonyPartitioning.onSustainOnEvent();
 }
 
 void ZSynthController::onSustainOffEvent() {
-  for(const auto &elem: genElements) {
-    elem->onSustainOffEvent();
+  for(const auto &voice: polyphonyPartitioning.onSustainOffEvent()) {
+    if (voice < polyphonyCount) {
+      adsrElements[voice]->release();
+    }
   }
 }
 

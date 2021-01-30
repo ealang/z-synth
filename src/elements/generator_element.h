@@ -2,12 +2,11 @@
 #define SQUARE_ELEMENT_H
 
 #include "../pipeline/pipeline_element.h"
-#include "../synth_utils/monophonic_note_receiver.h"
 
 #include <cstdint> 
 #include <functional>
 
-class GeneratorElement: public AudioElement<float>, public MonophonicNoteReceiver {
+class GeneratorElement: public AudioElement<float> {
   const uint32_t _fmPortNumber = 0;
 
   const uint32_t sampleRateHz;
@@ -16,9 +15,6 @@ class GeneratorElement: public AudioElement<float>, public MonophonicNoteReceive
 
   bool shouldPlay = false;
   uint32_t time = 0;
-
-  void onVirtualNoteOnEvent(unsigned char note, unsigned char vel) override;
-  void onVirtualNoteOffEvent() override;
 
 public:
   GeneratorElement(uint32_t sampleRateHz, std::function<float(uint32_t, uint32_t)> value);

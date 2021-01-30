@@ -1,5 +1,4 @@
 #include "./generator_element.h"
-#include "../synth_utils/midi_note_to_freq.h"
 #include <string.h>
 
 using namespace std;
@@ -38,15 +37,6 @@ void GeneratorElement::generate(
     float val = value(time, periodSize) * 0.1;
     *(out++) = val;
   }
-}
-
-void GeneratorElement::onVirtualNoteOnEvent(unsigned char note, unsigned char) {
-  targetFrequency = midiNoteToFreq(note);
-  shouldPlay = true;
-}
-
-void GeneratorElement::onVirtualNoteOffEvent() {
-  shouldPlay = false;
 }
 
 void GeneratorElement::setFrequency(float frequency) {
