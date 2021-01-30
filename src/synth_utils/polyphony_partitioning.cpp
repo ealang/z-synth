@@ -16,13 +16,13 @@ uint32_t PolyphonyPartitioning::voiceCount() const {
 }
 
 uint32_t PolyphonyPartitioning::onNoteOnEvent(unsigned char note) {
+  heldNotes.emplace(note);
+
   auto existingVoice = noteToVoice.find(note);
   if (existingVoice != noteToVoice.end()) {
     // Note: this shouldn't happen under normal circumstances
     return existingVoice->second;
   }
-
-  heldNotes.emplace(note);
 
   uint32_t voice_id = lruVoices.back();
   lruVoices.pop_back();
