@@ -9,30 +9,15 @@ GeneratorElement::GeneratorElement(uint32_t sampleRateHz, function<float(float)>
     _value(value) {}
 
 uint32_t GeneratorElement::maxInputs() const {
-  return 1;
+  return 2;
 }
 
 uint32_t GeneratorElement::fmPortNumber() const {
   return _fmPortNumber;
 }
 
-void GeneratorElement::generateFrequencyMod(uint32_t numSamples, float *out, const float *fmIn) {
-  for (uint32_t i = 0; i < numSamples; i++) {
-    float instFreq = _frequency + _fmRange * *(fmIn++);
-    float timeStep = instFreq / sampleRateHz;
-    time = fmod(time + timeStep, 1);
-
-    *(out++) = _value(time) * _amplitude;
-  }
-}
-
-void GeneratorElement::generateFixedFrequency(uint32_t numSamples, float *out) {
-  float timeStep = _frequency / sampleRateHz;
-
-  for (uint32_t i = 0; i < numSamples; i++) {
-    time = fmod(time + timeStep, 1);
-    *(out++) = _value(time) * _amplitude;
-  }
+uint32_t GeneratorElement::amPortNumber() const {
+  return _amPortNumber;
 }
 
 void GeneratorElement::generate(
@@ -41,16 +26,37 @@ void GeneratorElement::generate(
   uint32_t numInputs,
   inputs_t<float> inputs
 ) {
-  bool fixedFrequency = numInputs == 0 || _fmRange == 0;
-  if (!isEnabled || _amplitude == 0 || (fixedFrequency && _frequency == 0)) {
+  bool usingFm =
+    numInputs > _fmPortNumber &&
+    inputs[_fmPortNumber] &&
+    _fmRange > 0;
+  bool usingAm =
+    numInputs > _amPortNumber &&
+    inputs[_amPortNumber];
+
+  if (!isEnabled || (!usingAm && _amplitude == 0) || (!usingFm && _frequency == 0)) {
     memset(out, 0, numSamples * sizeof(float));
     return;
   }
 
-  if (fixedFrequency) {
-    generateFixedFrequency(numSamples, out);
-  } else {
-    generateFrequencyMod(numSamples, out, inputs[0]);
+  const float *fmIn = usingFm ? inputs[_fmPortNumber] : nullptr;
+  const float *amIn = usingAm ? inputs[_amPortNumber] : nullptr;
+
+  float timeStep = _frequency / sampleRateHz;
+  float instFreq = _frequency;
+  float instAmp = _amplitude;
+
+  for (uint32_t i = 0; i < numSamples; i++) {
+    if (usingFm) {
+      instFreq = _frequency + _fmRange * *(fmIn++);
+      timeStep = instFreq / sampleRateHz;
+    }
+    if (usingAm) {
+      instAmp = _amplitude * *(amIn++);
+    }
+
+    time = fmod(time + timeStep, 1);
+    *(out++) = _value(time) * instAmp;
   }
 }
 

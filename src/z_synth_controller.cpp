@@ -13,26 +13,34 @@ using namespace std;
 shared_ptr<AudioElement<float>> ZSynthController::makeWiring() const {
   PipelineBuilder<float> builder;
 
-  builder.registerElem("lfo", lfoElement);
-  builder.registerElem("dist", distElement);
-
   for (uint32_t i = 0; i < polyphonyCount; ++i) {
+    // generator
     char genName[20];
     snprintf(genName, sizeof(genName), "gen%d", i);
     builder.registerElem(genName, genElements[i]);
-    builder.connectElems("lfo", genName, genElements[i]->fmPortNumber());
 
+    // amp envelope
     char adsrName[20];
     snprintf(adsrName, sizeof(adsrName), "adsr%d", i);
     builder.registerElem(adsrName, adsrElements[i]);
 
-    builder.connectElems(genName, adsrName, adsrElements[i]->inputPortNumber());
-    builder.connectElems(adsrName, "amp", ampElement->inputPortNumber(i));
+    // distortion effect
+    char distName[20];
+    snprintf(distName, sizeof(distName), "dist%d", i);
+    builder.registerElem(distName, distElements[i]);
+
+    builder.connectElems("lfo", genName, genElements[i]->fmPortNumber());
+
+    builder.connectElems(adsrName, genName, genElements[i]->amPortNumber());
+    builder.connectElems(adsrName, distName, distElements[i]->modPortNumber());
+
+    builder.connectElems(genName, distName, distElements[i]->inputPortNumber());
+    builder.connectElems(distName, "amp", ampElement->inputPortNumber(i));
   }
 
+  builder.registerElem("lfo", lfoElement);
   builder.registerElem("amp", ampElement);
-  builder.connectElems("amp", "dist", distElement->inputPortNumber());
-  builder.setOutputElem("dist");
+  builder.setOutputElem("amp");
 
   return builder.build(params.bufferSampleCount);
 }
@@ -41,24 +49,24 @@ ZSynthController::ZSynthController(AudioParams params)
   : params(params),
     polyphonyPartitioning(polyphonyCount),
     ampElement(make_shared<AmpElement>(0.1)),
-    lfoElement(make_shared<GeneratorElement>(params.sampleRateHz, sine_function)),
-    distElement(make_shared<DistortionElement>(0.8))
+    lfoElement(make_shared<GeneratorElement>(params.sampleRateHz, square_function))
 {
   for (uint32_t i = 0; i < polyphonyCount; ++i) {
     auto genElem = make_shared<GeneratorElement>(params.sampleRateHz, sine_function);
     genElem->setAmplitude(0.1);
-    genElem->setFMLinearRange(5);
     genElements.emplace_back(genElem);
 
     auto adsrElem = make_shared<ADSRElement>(params.sampleRateHz);
     adsrElem->setAttackTime(0.1);
     adsrElem->setDecayTime(0.1);
-    adsrElem->setSustainLevel(0.8);
+    adsrElem->setSustainLevel(0.5);
     adsrElem->setReleaseTime(0.3);
     adsrElements.emplace_back(adsrElem);
+
+    distElements.emplace_back(make_shared<DistortionElement>(2, 1, 5));
   }
 
-  lfoElement->setFrequency(4);
+  lfoElement->setFrequency(8);
   lfoElement->setEnabled(true);
 
   _pipeline = makeWiring();
@@ -78,6 +86,7 @@ void ZSynthController::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
 void ZSynthController::onNoteOnEvent(unsigned char note, unsigned char) {
   uint32_t voice = polyphonyPartitioning.onNoteOnEvent(note);
   genElements[voice]->setFrequency(midiNoteToFreq(note));
+  genElements[voice]->setFMLinearRange((midiNoteToFreq(note + 1) - midiNoteToFreq(note)) * 0.25);
   genElements[voice]->setEnabled(true);
   adsrElements[voice]->trigger();
 }
