@@ -1,3 +1,8 @@
+/*
+ * References:
+ *  http://tldp.org/HOWTO/MIDI-HOWTO-9.html
+ *  https://www.alsa-project.org/alsa-doc/alsa-lib/_2test_2pcm_8c-example.html
+*/
 #include "./alsa.h"
 #include "./cli.h"
 

@@ -1,10 +1,11 @@
 #ifndef ALSA_H
 #define ALSA_H
 
-#include <tuple>
-#include <functional>
-#include <alsa/asoundlib.h>
 #include "./audio_params.h"
+
+#include <alsa/asoundlib.h>
+#include <functional>
+#include <tuple>
 
 class CLIParams;
 
