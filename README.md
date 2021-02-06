@@ -1,21 +1,6 @@
 # z-synth
 
-A minimal synth that uses ALSA. The intention is to provide a synth that can operate with low latency even on low performance devices (e.g. a raspi).
-
-The current sound is a square wave with some filtering and an amp envelope.
-
-Internally, the project's design allows for audio elements (e.g. generator, amplifier, filter) to be connected together in an acyclic graph to create the final sound.
-
-## Supported Midi Params
-
-| Control Number | Function        |
-|----------------|-----------------|
-| 1              | Distortion level (Mod wheel)
-| 7              | Channel volume |
-| 72             | Release time   |
-| 73             | Attack time    |
-| 74             | Sustain level  |
-| 75             | Decay time     |
+Wip synth.
 
 ## Dependencies
 
