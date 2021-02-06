@@ -11,15 +11,16 @@
 #include <memory>
 #include <vector>
 
-class MidiPolyphonyAdapter;
-class AmpElement;
-class GeneratorElement;
-class DistortionElement;
 class ADSRElement;
+class AmpElement;
+class DistortionElement;
+class GeneratorElement;
+class LowpassFilterElement;
+class MidiPolyphonyAdapter;
 
 // Wire up synth modules & midi events
 class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
-  static const uint32_t polyphonyCount = 64;
+  static const uint32_t polyphonyCount = 32;
   const AudioParams params;
   PolyphonyPartitioning polyphonyPartitioning;
 
@@ -28,6 +29,7 @@ class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
   std::vector<std::shared_ptr<GeneratorElement>> genElements;
   std::vector<std::shared_ptr<ADSRElement>> adsrElements;
   std::vector<std::shared_ptr<DistortionElement>> distElements;
+  std::vector<std::shared_ptr<LowpassFilterElement>> filterElements;
   std::shared_ptr<GeneratorElement> lfoElement;
 
   // logical element/wiring
