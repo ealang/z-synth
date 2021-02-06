@@ -35,14 +35,14 @@ CLIParams parseArgs(int argc, char *argv[]) {
     {"dump-metrics", 0, NULL, 'm'},
     {NULL, 0, NULL, 0},
   };
-  int morehelp = 0;
+  bool showHelp = false;
   while (1) {
     int c;
-    if ((c = getopt_long(argc, argv, "hD:r:c:f:b:p:m:o:vne", long_option, NULL)) < 0)
+    if ((c = getopt_long(argc, argv, "hD:r:b:p:c:dm", long_option, NULL)) < 0)
       break;
     switch (c) {
       case 'h':
-        morehelp++;
+        showHelp = true;
         break;
       case 'D':
         params.device = strdup(optarg);
@@ -66,7 +66,7 @@ CLIParams parseArgs(int argc, char *argv[]) {
         params.dumpMetrics = true;
     }
   }
-  if (morehelp) {
+  if (showHelp) {
     help(params);
     exit(EXIT_SUCCESS);
   }
