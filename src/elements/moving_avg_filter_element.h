@@ -1,5 +1,5 @@
-#ifndef FILTER_ELEMENT_H
-#define FILTER_ELEMENT_H
+#ifndef MOVING_AVG_FILTER_ELEMENT_H
+#define MOVING_AVG_FILTER_ELEMENT_H
 
 #include "../pipeline/pipeline_element.h"
 
@@ -7,12 +7,12 @@
 
 class RollingAverage;
 
-class FilterElement: public AudioElement<float> {
+class MovingAvgFilterElement: public AudioElement<float> {
   const uint32_t _inputPortNumber = 0;
   std::shared_ptr<RollingAverage> averager;
 
 public:
-  FilterElement(uint32_t length);
+  MovingAvgFilterElement(uint32_t length);
 
   uint32_t maxInputs() const override;
   uint32_t inputPortNumber() const;
