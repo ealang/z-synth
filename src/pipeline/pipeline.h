@@ -74,10 +74,6 @@ class Pipeline: public AudioElement<T> {
         throw std::runtime_error(str.str());
       }
 
-      if (numInputs == 0 && maxInputs > 0) {
-        std::cerr << "Warning: Element \"" << name << "\" received no inputs" << std::endl;
-      }
-
       std::vector<const T*> ins;
       for (const auto bufferNum: inputBuffers) {
         ins.push_back(
