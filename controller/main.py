@@ -1,5 +1,4 @@
-import sys
-
+import argparse
 import rtmidi
 
 
@@ -20,7 +19,12 @@ def nrpn_cmd_seq(param_high, param_low, value_high, value_low, channel=0, reset=
         yield CONTROL_CHANGE | channel, CONTROL_NRPN_LSB, 127
 
 
-def main(val):
+def send_seq(midiout, msg_seq):
+    for msg in msg_seq:
+        midiout.send_message(msg)
+
+
+def main(param_high, param_low, value_high):
     midiout = rtmidi.MidiOut()
 
     i = None
@@ -32,8 +36,26 @@ def main(val):
 
     midiout.open_port(i)
     with midiout:
-        for msg in nrpn_cmd_seq(param_high=0x13, param_low=0x37, value_high=val, value_low=0):
-            midiout.send_message(msg)
+        send_seq(
+            midiout,
+            nrpn_cmd_seq(param_high, param_low, value_high, value_low=0),
+        )
 
 
-main(int(sys.argv[1]))
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser("Send midi commands")
+    parser.add_argument("param", help="Param number in hex, format: HHLL")
+    parser.add_argument("value", type=int, help="Param high value in dec")
+    args = parser.parse_args()
+
+    if len(args.param) != 4:
+        raise Exception("Incorrect param format")
+
+    if args.value > 127 or args.value < 0:
+        raise Exception("Incorrect value range")
+
+    main(
+        param_high=int(args.param[:2], 16),
+        param_low=int(args.param[2:4], 16),
+        value_high=args.value,
+    )
