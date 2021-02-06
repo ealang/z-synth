@@ -10,7 +10,7 @@ class WeightedRollingAverage;
 class LowpassFilterElement: public AudioElement<float> {
   const uint32_t _inputPortNumber = 0;
   const uint32_t _modPortNumber = 1;
-  uint32_t _sampleRateHz;
+  const uint32_t _sampleRateHz;
   float _baseCutoffFreq;
   float _curCutoffFreq;
   std::shared_ptr<WeightedRollingAverage> _averager;
