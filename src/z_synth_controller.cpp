@@ -20,10 +20,14 @@ shared_ptr<AudioElement<float>> ZSynthController::makeWiring() const {
     snprintf(genName, sizeof(genName), "gen%d", i);
     builder.registerElem(genName, genElements[i]);
 
-    // adsr
-    char adsrName[20];
-    snprintf(adsrName, sizeof(adsrName), "adsr%d", i);
-    builder.registerElem(adsrName, adsrElements[i]);
+    // adsrs
+    char adsrAmpName[20];
+    snprintf(adsrAmpName, sizeof(adsrAmpName), "adsr-amp-%d", i);
+    builder.registerElem(adsrAmpName, adsrAmpElements[i]);
+
+    char adsrFilterName[20];
+    snprintf(adsrFilterName, sizeof(adsrFilterName), "adsr-filt-%d", i);
+    builder.registerElem(adsrFilterName, adsrFilterElements[i]);
 
     // filter
     char filterName[20];
@@ -37,7 +41,10 @@ shared_ptr<AudioElement<float>> ZSynthController::makeWiring() const {
 
     // generator mods
     builder.connectElems("lfo", genName, genElements[i]->fmPortNumber());
-    builder.connectElems(adsrName, genName, genElements[i]->amPortNumber());
+    builder.connectElems(adsrAmpName, genName, genElements[i]->amPortNumber());
+
+    // filter mods
+    builder.connectElems(adsrFilterName, filterName, filterElements[i]->modPortNumber());
 
     // gen -> filter -> dist -> amp
     builder.connectElems(genName, filterName, filterElements[i]->inputPortNumber());
@@ -64,16 +71,23 @@ ZSynthController::ZSynthController(AudioParams params)
     // genElem->setFMLinearRange(10);
     genElements.emplace_back(genElem);
 
-    auto adsrElem = make_shared<ADSRElement>(params.sampleRateHz);
-    adsrElem->setAttackTime(0.1);
-    adsrElem->setDecayTime(0.1);
-    adsrElem->setSustainLevel(0.5);
-    adsrElem->setReleaseTime(0.3);
-    adsrElements.emplace_back(adsrElem);
+    auto adsrFilterElem = make_shared<ADSRElement>(params.sampleRateHz);
+    adsrFilterElem->setAttackTime(0);
+    adsrFilterElem->setDecayTime(.1);
+    adsrFilterElem->setSustainLevel(.5);
+    adsrFilterElem->setReleaseTime(0.3);
+    adsrFilterElements.emplace_back(adsrFilterElem);
+
+    auto adsrAmpElem = make_shared<ADSRElement>(params.sampleRateHz);
+    adsrAmpElem->setAttackTime(0.1);
+    adsrAmpElem->setDecayTime(0.1);
+    adsrAmpElem->setSustainLevel(0.5);
+    adsrAmpElem->setReleaseTime(0.3);
+    adsrAmpElements.emplace_back(adsrAmpElem);
 
     distElements.emplace_back(make_shared<DistortionElement>(2, 1, 5));
 
-    filterElements.emplace_back(make_shared<LowpassFilterElement>(params.sampleRateHz, 1500, 26));
+    filterElements.emplace_back(make_shared<LowpassFilterElement>(params.sampleRateHz, 5000, 26));
   }
 
   lfoElement->setFrequency(8);
@@ -98,13 +112,15 @@ void ZSynthController::onNoteOnEvent(unsigned char note, unsigned char) {
   genElements[voice]->setFrequency(midiNoteToFreq(note));
   genElements[voice]->setFMLinearRange((midiNoteToFreq(note + 1) - midiNoteToFreq(note)) * 0.2);
   genElements[voice]->setEnabled(true);
-  adsrElements[voice]->trigger();
+  adsrAmpElements[voice]->trigger();
+  adsrFilterElements[voice]->trigger();
 }
 
 void ZSynthController::onNoteOffEvent(unsigned char note) {
   uint32_t voice = polyphonyPartitioning.onNoteOffEvent(note);
   if (voice < polyphonyCount) {
-    adsrElements[voice]->release();
+    adsrAmpElements[voice]->release();
+    adsrFilterElements[voice]->release();
   }
 }
 
@@ -115,7 +131,8 @@ void ZSynthController::onSustainOnEvent() {
 void ZSynthController::onSustainOffEvent() {
   for(const auto &voice: polyphonyPartitioning.onSustainOffEvent()) {
     if (voice < polyphonyCount) {
-      adsrElements[voice]->release();
+      adsrAmpElements[voice]->release();
+      adsrFilterElements[voice]->release();
     }
   }
 }

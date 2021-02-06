@@ -27,7 +27,8 @@ class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
   // elements
   std::shared_ptr<AmpElement> ampElement;
   std::vector<std::shared_ptr<GeneratorElement>> genElements;
-  std::vector<std::shared_ptr<ADSRElement>> adsrElements;
+  std::vector<std::shared_ptr<ADSRElement>> adsrAmpElements;
+  std::vector<std::shared_ptr<ADSRElement>> adsrFilterElements;
   std::vector<std::shared_ptr<DistortionElement>> distElements;
   std::vector<std::shared_ptr<LowpassFilterElement>> filterElements;
   std::shared_ptr<GeneratorElement> lfoElement;

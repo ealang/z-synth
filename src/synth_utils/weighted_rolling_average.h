@@ -10,9 +10,10 @@ class WeightedRollingAverage {
   uint32_t _bufferPos = 0;
 
 public:
+  WeightedRollingAverage(int n);
   WeightedRollingAverage(std::vector<float> weights);
 
-  void replaceWeights(std::vector <float> weights);
+  std::vector<float>& weights();
   float next(float value);
 };
 

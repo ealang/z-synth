@@ -13,36 +13,34 @@ static float sinc(float x) {
   return sin(x) / x;
 }
 
-static std::vector<float> firFilterWeights(uint32_t sampleRateHz, float cutoffFreq, int n) {
-  std::vector<float> weights(n);
-
+static void firFilterWeights(std::vector<float>& weights, uint32_t sampleRateHz, float cutoffFreq) {
+  const uint32_t n = weights.size();
   float normalizedFreq = cutoffFreq / (float)sampleRateHz * M_2PI;
+
   float sum = 0;
-  for (auto i = 0; i < n; ++i) {
+
+  for (uint32_t i = 0; i < n; ++i) {
     float weight = sinc((i - n / 2) * normalizedFreq);
     weights[i] = weight;
     sum += weight;
   }
 
-  for (auto i = 0; i < n; ++i) {
+  for (uint32_t i = 0; i < n; ++i) {
     weights[i] /= sum;
   }
-
-  return weights;
 }
 
 LowpassFilterElement::LowpassFilterElement(uint32_t sampleRateHz, float cutoffFreq, int n)
   : _sampleRateHz(sampleRateHz),
-    _n(n),
-    _averager(
-      std::make_shared<WeightedRollingAverage>(
-        firFilterWeights(sampleRateHz, cutoffFreq, n)
-      )
-    )
-{}
+    _baseCutoffFreq(cutoffFreq),
+    _curCutoffFreq(cutoffFreq),
+    _averager(std::make_shared<WeightedRollingAverage>(n))
+{
+  replaceWeights(cutoffFreq);
+}
 
 uint32_t LowpassFilterElement::maxInputs() const {
-  return 1;
+  return 2;
 }
 
 
@@ -50,15 +48,39 @@ uint32_t LowpassFilterElement::inputPortNumber() const {
   return _inputPortNumber;
 }
 
+uint32_t LowpassFilterElement::modPortNumber() const {
+  return _modPortNumber;
+}
+
+void LowpassFilterElement::replaceWeights(float cutoffFreq) {
+  _curCutoffFreq = cutoffFreq;
+  firFilterWeights(_averager->weights(), _sampleRateHz, cutoffFreq);
+}
+
 void LowpassFilterElement::setCutoffFreq(float frequency) {
-  _averager->replaceWeights(firFilterWeights(_sampleRateHz, frequency, _n));
+  _baseCutoffFreq = frequency;
 }
 
 void LowpassFilterElement::generate(uint32_t numSamples, float* out, uint32_t numInputs, inputs_t<float> inputs) {
-  if (numInputs > 0) {
-    const float* input = inputs[_inputPortNumber];
+  bool inputConnected = numInputs > _inputPortNumber && inputs[_inputPortNumber];
+
+  float cutoffFreq = _baseCutoffFreq;
+  if (inputConnected) {
+    const float* sigIn = inputs[_inputPortNumber];
+
+    bool modConnected = numInputs > _modPortNumber && inputs[_modPortNumber];
+    const float* modIn = modConnected ? inputs[_modPortNumber] : nullptr;
+
     for (uint32_t i = 0; i < numSamples; ++i) {
-      *(out++) = _averager->next(*(input++));
+      if (modIn) {
+        cutoffFreq = *(modIn++) * _baseCutoffFreq;
+      }
+
+      if (cutoffFreq != _curCutoffFreq) {
+        replaceWeights(cutoffFreq);
+      }
+
+      *(out++) = _averager->next(*(sigIn++));
     }
   } else {
     memset(out, 0, numSamples * sizeof(float));
