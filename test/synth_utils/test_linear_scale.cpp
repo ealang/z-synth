@@ -1,5 +1,5 @@
-#include <gtest/gtest.h>
 #include "../../src/synth_utils/linear_scale.h"
+#include <gtest/gtest.h>
 
 TEST(LinearScale, givenValueOutOfDomain_ItClampToClosestValue) {
   float left = 10;

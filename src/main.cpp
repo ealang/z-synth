@@ -1,16 +1,14 @@
-#include <mutex>
-#include <thread>
-
-#include "./rx_include.h"
-
-#include "./alsa/alsa.h"
-#include "./alsa/loops.h"
-
 #include "./cli.h"
 #include "./metric.h"
 #include "./synth_utils/midi_filters.h"
 #include "./synth_utils/midi_tap.h"
 #include "./z_synth_controller.h"
+
+#include "./alsa/alsa.h"
+#include "./alsa/loops.h"
+
+#include <mutex>
+#include <thread>
 
 using namespace std;
 
