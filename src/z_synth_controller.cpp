@@ -73,7 +73,7 @@ ZSynthController::ZSynthController(AudioParams params)
 
     auto adsrFilterElem = make_shared<ADSRElement>(params.sampleRateHz);
     adsrFilterElem->setAttackTime(0);
-    adsrFilterElem->setDecayTime(.1);
+    adsrFilterElem->setDecayTime(.2);
     adsrFilterElem->setSustainLevel(.5);
     adsrFilterElem->setReleaseTime(0.3);
     adsrFilterElements.emplace_back(adsrFilterElem);
@@ -96,8 +96,7 @@ ZSynthController::ZSynthController(AudioParams params)
   _pipeline = makeWiring();
 }
 
-std::shared_ptr<AudioElement<float>> ZSynthController::pipeline() const
-{
+std::shared_ptr<AudioElement<float>> ZSynthController::pipeline() const {
   return _pipeline;
 }
 
@@ -105,7 +104,6 @@ void ZSynthController::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
   MidiNoteListener::injectMidi(midi);
   MidiNRPNListener::injectMidi(midi);
 }
-
 
 void ZSynthController::onNoteOnEvent(unsigned char note, unsigned char) {
   uint32_t voice = polyphonyPartitioning.onNoteOnEvent(note);

@@ -86,16 +86,16 @@ TEST(ADSRElementTest, givenFastOnOff_ItStaysZero) {
 
 TEST(ADSRElementTest, givenRepeatAttack_ItResets) {
   ADSRElement element(1);
-  element.setAttackTime(5);
-  element.setDecayTime(5);
-  element.setSustainLevel(.5);
+  element.setAttackTime(10);
+  element.setDecayTime(0);
+  element.setSustainLevel(1);
   element.setMaxAmplitude(10);
 
   element.trigger();
-  expect_buffer_eq({0, 2, 4, 6}, element);
+  expect_buffer_eq({0, 1, 2, 3, 4}, element);
   element.release();
   element.trigger();
-  expect_buffer_eq({8, 10, 9, 8, 7, 6, 5, 5}, element);
+  expect_buffer_eq({5, 5.5, 6, 6.5, 7, 7.5}, element);
 }
 
 TEST(ADSRElementTest, givenRepeatAttackAndParameterChange_ItResets) {
@@ -108,11 +108,11 @@ TEST(ADSRElementTest, givenRepeatAttackAndParameterChange_ItResets) {
   element.trigger();
   expect_buffer_eq({0, 2, 4, 6}, element);
 
-  element.setAttackTime(10);
+  element.setAttackTime(4);
 
   element.release();
   element.trigger();
-  expect_buffer_eq({8, 9, 10, 9, 8, 7, 6, 5, 5}, element);
+  expect_buffer_eq({8, 8.5, 9, 9.5, 10}, element);
 }
 
 TEST(ADSRElementTest, givenReleaseDuringAttack_ItGoesToZero) {
@@ -124,8 +124,8 @@ TEST(ADSRElementTest, givenReleaseDuringAttack_ItGoesToZero) {
   element.setReleaseTime(10);
 
   element.trigger();
-  expect_buffer_eq({0, 1, 2, 3, 4, 5}, element);
+  expect_buffer_eq({0, 1, 2, 3, 4}, element);
 
   element.release();
-  expect_buffer_eq({6, 5, 4, 3, 2, 1, 0, 0}, element);
+  expect_buffer_eq({5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5, 0, 0}, element);
 }

@@ -3,17 +3,15 @@
 #include <cstring>
 #include <cmath>
 
-static float computeSlope(float sign, float delta, float time, uint32_t sampleRateHz) {
+static float computeSlope(float delta, float time, uint32_t sampleRateHz) {
   if (time == 0) {
     return 0;
   }
-  float slope = delta / (time * sampleRateHz);
-  return slope * (sign >= 0 ? 1 : -1);
+  return delta / (time * sampleRateHz);
 }
 
-static uint32_t numStepsToValue(float startValue, float targetValue, float valueStep) {
-  float delta = targetValue - startValue;
-  if (delta == 0 || valueStep == 0) {
+static uint32_t numStepsToValue(float delta, float valueStep) {
+  if (valueStep == 0) {
     return 0;
   }
   return round(delta / valueStep);
@@ -55,8 +53,9 @@ void ADSRElement::nextState() {
     state = State::attack;
     const float target = _decayTime > 0 ? 1 : _sustainLevel;
     if (_attackTime > 0) {
-      valueStep = computeSlope(target - curValue, target, _attackTime, sampleRateHz);
-      countdown = numStepsToValue(curValue, target, valueStep);
+      const float delta = target - curValue;
+      valueStep = computeSlope(delta, _attackTime, sampleRateHz);
+      countdown = numStepsToValue(delta, valueStep);
       return;
     }
     curValue = target;
@@ -66,8 +65,9 @@ void ADSRElement::nextState() {
     state = State::decay;
     if (_decayTime > 0) {
       const float target = _sustainLevel;
-      valueStep = computeSlope(target - curValue, 1 - _sustainLevel, _decayTime, sampleRateHz);
-      countdown = numStepsToValue(curValue, target, valueStep);
+      const float delta = target - curValue;
+      valueStep = computeSlope(delta, _decayTime, sampleRateHz);
+      countdown = numStepsToValue(delta, valueStep);
       return;
     }
 
@@ -80,8 +80,9 @@ void ADSRElement::nextState() {
   if (state == State::release) {
     if (_releaseTime > 0) {
       const float target = 0;
-      valueStep = computeSlope(target - curValue, _sustainLevel, _releaseTime, sampleRateHz);
-      countdown = numStepsToValue(curValue, target, valueStep);
+      const float delta = target - curValue;
+      valueStep = computeSlope(delta, _releaseTime, sampleRateHz);
+      countdown = numStepsToValue(delta, valueStep);
       return;
     }
     curValue = 0;
