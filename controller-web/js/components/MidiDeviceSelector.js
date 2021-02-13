@@ -1,5 +1,4 @@
 function MidiDeviceSelector({devices, selectedDevice, onSelectDevice}) {
-
   function deviceFromId(deviceId) {
     const i = devices.findIndex(_ => _.id === deviceId);
     if (i === -1) {

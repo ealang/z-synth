@@ -1,28 +1,4 @@
-function Sender({device}) {
-  const CONTROL_CHANGE = 0xB0;
-  const CONTROL_DATA_MSB = 0x06;
-  const CONTROL_DATA_LSB = 0x26;
-  const CONTROL_NRPN_MSB = 0x63;
-  const CONTROL_NRPN_LSB = 0x62;
-
-  function onSend() {
-    if (device) {
-      // device.send([0x90, 40, 127]);
-
-      device.send([CONTROL_CHANGE, CONTROL_NRPN_MSB, 0x13]);
-      device.send([CONTROL_CHANGE, CONTROL_NRPN_LSB, 0x37]);
-      device.send([CONTROL_CHANGE, CONTROL_DATA_MSB, 40]);
-    }
-  }
-
-  return (
-    <div>
-      <button onClick={onSend}>Send</button>
-    </div>
-  );
-}
-
-function App() {
+function App({paramStore, paramController}) {
   const [errorMsg, setErrorMsg] = React.useState("");
   const [devices, setDevices] = React.useState([]);
   const [selectedDevice, setSelectedDevice] = React.useState(null);
@@ -31,22 +7,34 @@ function App() {
     webMidiSubscribe(setDevices, setErrorMsg);
   }, []);
 
-  function onSelectDevice(device) {
-    console.log("got device", device && device.name);
+  function onParamChanged(param, value) {
+    paramController.setParam(param, value);
+    paramStore.setParam(param, value);
+  }
+
+  function onDeviceChanged(device) {
+    paramController.setDevice(device);
     setSelectedDevice(device);
+  }
+
+  function onSyncParams() {
+    paramController.setParamsBulk(paramStore.allParams());
   }
 
   return (
     <div>
+      <h1>z-synth</h1>
       <div>
-        <h1>Device</h1>
         {errorMsg && <div className="error">Error initializing Midi: {errorMsg}</div>}
         {!errorMsg && <MidiDeviceSelector
           devices={devices}
           selectedDevice={selectedDevice}
-          onSelectDevice={onSelectDevice} />}
+          onSelectDevice={onDeviceChanged} />}
       </div>
-      {selectedDevice && <Sender device={selectedDevice} />}
+      <div>
+        <ParamControls initParams={paramStore.allParams()} onParamChanged={onParamChanged} />
+        <button onClick={onSyncParams}>Sync Params</button>
+      </div>
     </div>
   );
 }
