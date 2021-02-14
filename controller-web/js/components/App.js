@@ -2,6 +2,7 @@ function App({paramStore, paramController}) {
   const [errorMsg, setErrorMsg] = React.useState("");
   const [devices, setDevices] = React.useState([]);
   const [selectedDevice, setSelectedDevice] = React.useState(null);
+  const [instance, setInstance] = React.useState(null);
 
   React.useEffect(() => {
     webMidiSubscribe(setDevices, setErrorMsg);
@@ -17,23 +18,32 @@ function App({paramStore, paramController}) {
     setSelectedDevice(device);
   }
 
-  function onSyncParams() {
+  function onSendAll() {
     paramController.setParamsBulk(paramStore.allParams());
+  }
+
+  function onResetParams() {
+    paramStore.reset();
+    setInstance(new Date());
+    onSendAll();
   }
 
   return (
     <div>
       <h1>z-synth</h1>
-      <div>
+      <div className="app-device">
         {errorMsg && <div className="error">Error initializing Midi: {errorMsg}</div>}
         {!errorMsg && <MidiDeviceSelector
           devices={devices}
           selectedDevice={selectedDevice}
           onSelectDevice={onDeviceChanged} />}
+        <div>
+          <button onClick={onSendAll}>Send All</button>
+          <button onClick={onResetParams}>Reset</button>
+        </div>
       </div>
-      <div>
-        <ParamControls initParams={paramStore.allParams()} onParamChanged={onParamChanged} />
-        <button onClick={onSyncParams}>Sync Params</button>
+      <div className="app-params">
+        <ParamControls key={instance} initParams={paramStore.allParams()} onParamChanged={onParamChanged} />
       </div>
     </div>
   );

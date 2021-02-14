@@ -2,7 +2,6 @@ function ParamController() {
   const debounceValue = .05;
   const debounceTimeMs = 50;
 
-  const params = {};
   var lastTime = 0;
   var device = null;
 
@@ -31,20 +30,7 @@ function ParamController() {
       });
     },
     setParam: (param, value) => {
-      const existing = params[param];
-      const time = new Date();
-
-      if (
-        existing !== value && (
-          existing === undefined ||
-          time - lastTime >= debounceTimeMs ||
-          Math.abs(existing - value) > debounceValue
-        )
-      ) {
-        params[param] = value;
-        lastTime = time;
-        sendParam(param, value);
-      }
+      sendParam(param, value);
     },
   }
 }

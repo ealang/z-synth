@@ -1,5 +1,6 @@
 body {
-  background-color: aqua;
+  background-color: PaleGreen;
+  user-select: none;
 }
 
 div#root {
@@ -14,18 +15,84 @@ div#root {
   color: red;
 }
 
+/****************************************/
+
+.flex-container-row {
+  display: flex;
+  flex-direction: row;
+}
+
+.flex-container-column {
+  display: flex;
+  flex-direction: column;
+}
+
+/****************************************/
+
+h1 {
+  margin-left: 20px;
+  color: DimGray;
+}
+
+.app-params, .app-device {
+  margin: 20px;
+  margin-bottom: 0;
+}
+
+.app-device button {
+  margin-top: 5px;
+  margin-right: 5px;
+}
+
+/****************************************/
+
+.control-group {
+  background-color: DimGray;
+  display: inline-block;
+  padding: 15px;
+  margin: 10px;
+  margin-left: 0;
+  margin-bottom: 0;
+  border-style: solid;
+  border-width: 5px;
+  border-color: AliceBlue;
+  color: AliceBlue;
+}
+
+.control-group-label {
+  margin: 0 0 10px 0;
+}
+
+.control-group-contents svg.knob {
+  display: inline;
+}
+
+.knob-label-container {
+  padding: 0 5px;
+  text-align: center;
+}
+
+.select-label-container {
+  padding: 0 10px;
+  justify-content: center;
+}
+
+/****************************************/
+
 svg.knob {
   display: block;
 }
 
 .knob circle {
-  fill: transparent;
+  fill: Gold;
 }
 
-.knob circle, .knob line.blade {
-  stroke: red;
+.knob {
+  stroke: DeepSkyBlue;
 }
 
-.knob line.tick {
-  stroke: red;
+.knob .tick {
+  stroke: AliceBlue;
 }
+
+/****************************************/
