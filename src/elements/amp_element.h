@@ -7,12 +7,14 @@
  * Control amplitude of an input using a multipier.
  */
 class AmpElement: public AudioElement<float> {
-  float masterAmp;
+  float _amp;
 public:
-  AmpElement(float masterAmp);
+  AmpElement(float amp);
 
   uint32_t maxInputs() const override;
   uint32_t inputPortNumber(uint32_t i) const;
+
+  void setAmp(float amp);
 
   void generate(uint32_t numSamples, float* out, uint32_t numInputs, inputs_t<float> inputs) override;
 };

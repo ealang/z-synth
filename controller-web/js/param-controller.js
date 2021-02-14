@@ -8,11 +8,16 @@ function ParamController() {
 
   function sendParam(param, value) {
     if (device !== null) {
-      console.log("sending", param, value);
-      const messages = PARAM_COMMANDS[param](value);
-      messages.forEach(message => {
-        device.send(message);
-      });
+      const cmdGenerator = PARAM_COMMANDS[param];
+      if (cmdGenerator) {
+        const messages = cmdGenerator(value);
+        console.log("Sending", param, value);
+        messages.forEach(message => {
+          device.send(message);
+        });
+      } else {
+        console.error("Ignoring unknown param", param);
+      }
     }
   }
 

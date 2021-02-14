@@ -25,6 +25,10 @@ class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
   const AudioParams params;
   PolyphonyPartitioning polyphonyPartitioning;
 
+  float fmSemitoneRange = 0.2;
+  float gen1SemitoneOffset = 0;
+  float gen2SemitoneOffset = 0;
+
   // elements
   std::shared_ptr<AmpElement> ampElement;
   std::vector<std::shared_ptr<GeneratorElement>> genElements1;

@@ -12,6 +12,18 @@
 
 using namespace std;
 
+static const float filterMinCutoffHz = 0;
+static const float filterMaxCutoffHz = 15000;
+static const float maxFmSemiToneRange = 3;
+static const float semitoneOffsetMin = -24;
+static const float semitoneOffsetMax = 24;
+static const float envelopeMaxAttack = 2;
+static const float envelopeMaxDecay = 2;
+static const float envelopeMaxRelease = 10;
+static const float maxDistortionParam = 5;
+static const float minLFOFrequencyHz = 0.1;
+static const float maxLFOFrequencyHz = 50;
+
 shared_ptr<AudioElement<float>> ZSynthController::makeWiring() const {
   PipelineBuilder<float> builder;
 
@@ -130,12 +142,15 @@ void ZSynthController::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
 
 void ZSynthController::onNoteOnEvent(unsigned char note, unsigned char) {
   uint32_t voice = polyphonyPartitioning.onNoteOnEvent(note);
-  float frequency = midiNoteToFreq(note);
-  float frequencyModRange = (midiNoteToFreq(note + 1) - frequency) * 0.2;
-  genElements1[voice]->setFrequency(frequency);
-  genElements2[voice]->setFrequency(frequency);
-  genElements1[voice]->setFMLinearRange(frequencyModRange);
-  genElements2[voice]->setFMLinearRange(frequencyModRange);
+
+  float frequency1 = midiNoteToFreq((float)note + gen1SemitoneOffset);
+  float frequency2 = midiNoteToFreq((float)note + gen2SemitoneOffset);
+  float frequencyModRange1 = (midiNoteToFreq(note + 1) - frequency1) * fmSemitoneRange;
+  float frequencyModRange2 = (midiNoteToFreq(note + 1) - frequency2) * fmSemitoneRange;
+  genElements1[voice]->setFrequency(frequency1);
+  genElements2[voice]->setFrequency(frequency2);
+  genElements1[voice]->setFMLinearRange(frequencyModRange1);
+  genElements2[voice]->setFMLinearRange(frequencyModRange2);
 
   adsrAmpElements[voice]->trigger();
   adsrFilterElements[voice]->trigger();
@@ -167,30 +182,144 @@ void ZSynthController::onNRPNValueHighChange(
   unsigned char paramLow,
   unsigned char paramValue
 ) {
-  if (paramHigh == 0x13 && paramLow == 0x37) {
-    function<float(float)> value;
-    if (paramValue == 0) {
-      std::cout << "Set generator to square" << std::endl;
-      value = square_function;
-    } else {
-      std::cout << "Set generator to sine" << std::endl;
-      value = sine_function;
-    }
-    for (auto &elem: genElements1) {
-      elem->setValue(value);
-    }
-  } else if (paramHigh == 0x13 && paramLow == 0x38) {
-    float cutoffFreq = paramValue / 127. * 10000.;
-    std::cout << "Set cutoff frequency to " << cutoffFreq << std::endl;
-    for (auto &elem: filterElements) {
-      elem->setCutoffFreq(cutoffFreq);
-    }
-  } else if (paramHigh == 0x13 && paramLow == 0x39) {
-    float mix = paramValue / 127.;
-    std::cout << "Set mix to " << mix << std::endl;
-    for (auto &mixer: mixerElements) {
-      mixer->setWeight(0, mix);
-      mixer->setWeight(1, 1 - mix);
+  static vector<function<float(float)>> generatorTable {
+    square_function,
+    sine_function,
+    triangle_function,
+    noise_function,
+    saw_function
+  };
+
+  const uint8_t NRPN_MSB_VALUE = 0x10;
+
+  const uint8_t PARAM_GEN1_WAVE_TYPE     = 0x00;
+  const uint8_t PARAM_GEN2_WAVE_TYPE     = 0x01;
+  const uint8_t PARAM_GEN_MIX            = 0x02;
+  const uint8_t PARAM_FILTER_CUTOFF      = 0x03;
+  const uint8_t PARAM_GEN1_OFFSET        = 0x04;
+  const uint8_t PARAM_GEN2_OFFSET        = 0x05;
+  const uint8_t PARAM_AMP_ENV_ATTACK     = 0x06;
+  const uint8_t PARAM_AMP_ENV_DECAY      = 0x07;
+  const uint8_t PARAM_AMP_ENV_SUSTAIN    = 0x08;
+  const uint8_t PARAM_AMP_ENV_RELEASE    = 0x09;
+  const uint8_t PARAM_FILTER_ENV_ATTACK  = 0x0A;
+  const uint8_t PARAM_FILTER_ENV_DECAY   = 0x0B;
+  const uint8_t PARAM_FILTER_ENV_SUSTAIN = 0x0C;
+  const uint8_t PARAM_FILTER_ENV_RELEASE = 0x0D;
+  const uint8_t PARAM_DISTORTION         = 0x0E;
+  const uint8_t PARAM_LFO_AMP            = 0x0F;
+  const uint8_t PARAM_LFO_FREQ           = 0x10;
+  const uint8_t PARAM_LFO_WAVE_TYPE      = 0x11;
+  const uint8_t PARAM_MASTER_AMP         = 0x12;
+
+  if (paramHigh == NRPN_MSB_VALUE) {
+    if (paramLow == PARAM_GEN1_WAVE_TYPE) {
+      // Generator 1 wave type
+      if (paramValue < generatorTable.size()) {
+        std::cout << "Set gen 1 wave " << static_cast<int>(paramValue) << std::endl;
+        for (auto &elem: genElements1) {
+          elem->setValue(generatorTable[paramValue]);
+        }
+      }
+    } else if (paramLow == PARAM_GEN2_WAVE_TYPE) {
+      // Generator 2 wave type
+      if (paramValue < generatorTable.size()) {
+        std::cout << "Set gen 2 wave " << static_cast<int>(paramValue) << std::endl;
+        for (auto &elem: genElements2) {
+          elem->setValue(generatorTable[paramValue]);
+        }
+      }
+    } else if (paramLow == PARAM_GEN_MIX) {
+      // Generator 1-2 mix
+      const float mix = paramValue / 127.;
+      std::cout << "Set mix to " << mix << std::endl;
+      for (auto &mixer: mixerElements) {
+        mixer->setWeight(0, mix);
+        mixer->setWeight(1, 1 - mix);
+      }
+    } else if (paramLow == PARAM_FILTER_CUTOFF) {
+      float cutoffFreq = (paramValue / 127.) * (filterMaxCutoffHz - filterMinCutoffHz) + filterMinCutoffHz;
+      std::cout << "Set cutoff frequency to " << cutoffFreq << std::endl;
+      for (auto &elem: filterElements) {
+        elem->setCutoffFreq(cutoffFreq);
+      }
+    } else if (paramLow == PARAM_GEN1_OFFSET) {
+      gen1SemitoneOffset = (paramValue / 127.) * (semitoneOffsetMax - semitoneOffsetMin) + semitoneOffsetMin;
+      std::cout << "Set gen 1 offset to " << gen1SemitoneOffset << std::endl;
+    } else if (paramLow == PARAM_GEN2_OFFSET) {
+      gen2SemitoneOffset = (paramValue / 127.) * (semitoneOffsetMax - semitoneOffsetMin) + semitoneOffsetMin;
+      std::cout << "Set gen 2 offset to " << gen2SemitoneOffset << std::endl;
+    } else if (paramLow == PARAM_AMP_ENV_ATTACK) {
+      float attack = (paramValue / 127.) * envelopeMaxAttack;
+      std::cout << "Set amp attack time to " << attack << std::endl;
+      for (auto &elem: adsrAmpElements) {
+        elem->setAttackTime(attack);
+      }
+    } else if (paramLow == PARAM_AMP_ENV_DECAY) {
+      float decay = (paramValue / 127.) * envelopeMaxDecay;
+      std::cout << "Set amp decay time to " << decay << std::endl;
+      for (auto &elem: adsrAmpElements) {
+        elem->setDecayTime(decay);
+      }
+    } else if (paramLow == PARAM_AMP_ENV_SUSTAIN) {
+      float sustain = (paramValue / 127.);
+      std::cout << "Set amp sustain level to " << sustain << std::endl;
+      for (auto &elem: adsrAmpElements) {
+        elem->setSustainLevel(sustain);
+      }
+    } else if (paramLow == PARAM_AMP_ENV_RELEASE) {
+      float release = (paramValue / 127.) * envelopeMaxRelease;
+      std::cout << "Set amp release time to " << release << std::endl;
+      for (auto &elem: adsrAmpElements) {
+        elem->setReleaseTime(release);
+      }
+    } else if (paramLow == PARAM_FILTER_ENV_ATTACK) {
+      float attack = (paramValue / 127.) * envelopeMaxAttack;
+      std::cout << "Set filter attack time to " << attack << std::endl;
+      for (auto &elem: adsrFilterElements) {
+        elem->setAttackTime(attack);
+      }
+    } else if (paramLow == PARAM_FILTER_ENV_DECAY) {
+      float decay = (paramValue / 127.) * envelopeMaxDecay;
+      std::cout << "Set filter decay time to " << decay << std::endl;
+      for (auto &elem: adsrFilterElements) {
+        elem->setDecayTime(decay);
+      }
+    } else if (paramLow == PARAM_FILTER_ENV_SUSTAIN) {
+      float sustain = (paramValue / 127.);
+      std::cout << "Set filter sustain level to " << sustain << std::endl;
+      for (auto &elem: adsrFilterElements) {
+        elem->setSustainLevel(sustain);
+      }
+    } else if (paramLow == PARAM_FILTER_ENV_RELEASE) {
+      float release = (paramValue / 127.) * envelopeMaxRelease;
+      std::cout << "Set filter release time to " << release << std::endl;
+      for (auto &elem: adsrFilterElements) {
+        elem->setReleaseTime(release);
+      }
+    } else if (paramLow == PARAM_DISTORTION) {
+      float value = (paramValue / 127.) * maxDistortionParam;
+      std::cout << "Set distortion param to " << value << std::endl;
+      for (auto &elem: distElements) {
+        elem->setDefaultAmount(value);
+      }
+    } else if (paramLow == PARAM_LFO_AMP) {
+      float value = (paramValue / 127.);
+      std::cout << "Set LFO amp to " << value << std::endl;
+      lfoElement->setAmplitude(value);
+    } else if (paramLow == PARAM_LFO_FREQ) {
+      float value = (paramValue / 127.) * (maxLFOFrequencyHz - minLFOFrequencyHz) + minLFOFrequencyHz;
+      std::cout << "Set LFO frequency to " << value << std::endl;
+      lfoElement->setFrequency(value);
+    } else if (paramLow == PARAM_LFO_WAVE_TYPE) {
+      if (paramValue < generatorTable.size()) {
+        std::cout << "Set LFO wave " << static_cast<int>(paramValue) << std::endl;
+        lfoElement->setValue(generatorTable[paramValue]);
+      }
+    } else if (paramLow == PARAM_MASTER_AMP) {
+      float value = (paramValue / 127.);
+      std::cout << "Set master amp " << value << std::endl;
+      ampElement->setAmp(value);
     }
   }
 }

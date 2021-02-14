@@ -1,12 +1,12 @@
 function ParamControls({initParams, onParamChanged}) {
-  const mix = React.useState(initParams[PARAM_MIX]);
-  const cutoff = React.useState(initParams[PARAM_CUTOFF]);
-  const wave1Sel = React.useState(initParams[PARAM_WAVE]);
+  const mix = React.useState(initParams[PARAM_GEN_MIX]);
+  const cutoff = React.useState(initParams[PARAM_FILTER_CUTOFF]);
+  const wave1Sel = React.useState(initParams[PARAM_GEN1_WAVE_TYPE]);
 
   const knobs = {
-    [PARAM_MIX]: mix,
-    [PARAM_CUTOFF]: cutoff,
-    [PARAM_WAVE]: wave1Sel,
+    [PARAM_GEN_MIX]: mix,
+    [PARAM_FILTER_CUTOFF]: cutoff,
+    [PARAM_GEN1_WAVE_TYPE]: wave1Sel,
   };
 
   const onKnobChange = (param) => {
@@ -26,9 +26,9 @@ function ParamControls({initParams, onParamChanged}) {
 
   return (
     <div>
-      <Knob value={mix[0]} onValueChanged={onKnobChange(PARAM_MIX)} />
-      <Knob value={cutoff[0]} onValueChanged={onKnobChange(PARAM_CUTOFF)} />
-      <Select value={wave1Sel[0]} values={PARAM_WAVE_OPTIONS} onValueChanged={onSelectChange(PARAM_WAVE)} />
+      <Knob value={mix[0]} onValueChanged={onKnobChange(PARAM_GEN_MIX)} />
+      <Knob value={cutoff[0]} onValueChanged={onKnobChange(PARAM_FILTER_CUTOFF)} />
+      <Select value={wave1Sel[0]} values={PARAM_WAVE_OPTIONS} onValueChanged={onSelectChange(PARAM_GEN1_WAVE_TYPE)} />
     </div>
   );
 }
