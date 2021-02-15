@@ -13,7 +13,7 @@ public:
   WeightedRollingAverage(int n);
   WeightedRollingAverage(std::vector<float> weights);
 
-  std::vector<float>& weights();
+  void setWeights(std::vector<float> weights);
   float next(float value);
 };
 

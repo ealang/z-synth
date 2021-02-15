@@ -1,5 +1,7 @@
 #include "./weighted_rolling_average.h"
 
+#include <stdexcept>
+
 WeightedRollingAverage::WeightedRollingAverage(int n)
   : _weights(n, 1. / n),
     _buffer(n, 0)
@@ -10,8 +12,11 @@ WeightedRollingAverage::WeightedRollingAverage(std::vector<float> weights)
     _buffer(weights.size(), 0)
 {}
 
-std::vector<float>& WeightedRollingAverage::weights() {
-  return _weights;
+void WeightedRollingAverage::setWeights(std::vector<float> weights) {
+  if (weights.size() != _weights.size()) {
+    throw std::runtime_error("Weights size changed");
+  }
+  _weights = weights;
 }
 
 float WeightedRollingAverage::next(float value) {

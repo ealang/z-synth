@@ -15,8 +15,8 @@ using namespace std;
 
 static const uint32_t polyphonyCount = 32;
 
-static const float filterMinCutoffHz = 0;
-static const float filterMaxCutoffHz = 15000;
+static const float filterMinCutoffHz = 50;
+static const float filterMaxCutoffHz = 10000;
 static const float maxFmSemiToneRange = 3;
 static const float envelopeMinAttack = 0.01;
 static const float envelopeMaxAttack = 1;
@@ -126,7 +126,7 @@ ZSynthController::ZSynthController(AudioParams params)
 
     distElements.emplace_back(make_shared<DistortionElement>(2, 1, 5));
 
-    filterElements.emplace_back(make_shared<LowpassFilterElement>(params.sampleRateHz, 3500, 26));
+    filterElements.emplace_back(make_shared<LowpassFilterElement>(params.sampleRateHz, 3500, 101));
   }
 
   lfoElement->setFrequency(8);
