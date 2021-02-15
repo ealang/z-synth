@@ -1,13 +1,20 @@
 #ifndef PIPELINE_H
 #define PIPELINE_H
 
+#define PIPELINE_H_PROFILING 0
+
+#include "./plan_execution.h"
+#include "./pipeline_element.h"
+
+#if PIPELINE_H_PROFILING
+#include "../metric.h"
+#endif
+
 #include <sstream>
 #include <exception>
 #include <memory>
 #include <unordered_map>
 #include <vector>
-#include "./plan_execution.h"
-#include "./pipeline_element.h"
 
 template <typename T>
 struct ExecutionStep {
@@ -24,11 +31,39 @@ template <typename T>
 class Pipeline: public AudioElement<T> {
   std::vector<ExecutionStep<T>> steps;
 
+  #if PIPELINE_H_PROFILING
+  std::vector<std::string> stepNames;
+  std::vector<Metric> stepMetrics;
+  const uint32_t metricLength = 1000;
+  clock_t nextReportTime = 0;
+  clock_t reportInterval = CLOCKS_PER_SEC * 5;
+  #endif
+
   uint32_t bufferSize;
   std::vector<T> buffer;
   int outputStep = -1;
 
-  public:
+  #if PIPELINE_H_PROFILING
+  void reportMetrics() const {
+    auto namesIt = stepNames.cbegin();
+    auto metricsIt = stepMetrics.cbegin();
+    while (namesIt != stepNames.cend()) {
+      auto report = metricsIt->report();
+
+      printf("%s, %.3f, %.3f, %.3f\n",
+        namesIt->c_str(),
+        report.max * 1000,
+        report.p99 * 1000,
+        report.p75 * 1000
+      );
+
+      ++namesIt;
+      ++metricsIt;
+    }
+  }
+  #endif
+
+public:
   Pipeline(
     uint32_t bufferSize,
     const std::unordered_map<std::string, std::shared_ptr<AudioElement<T>>>& audioElems,
@@ -83,11 +118,17 @@ class Pipeline: public AudioElement<T> {
         );
       }
 
-      steps.push_back(ExecutionStep<T> {
+      steps.emplace_back(ExecutionStep<T> {
         audioElems.find(name)->second,
         ins,
         buffer.data() + outputBuffer * bufferSize
       });
+
+      #if PIPELINE_H_PROFILING
+      stepNames.emplace_back(name);
+      stepMetrics.emplace_back(metricLength);
+      #endif
+
       stepIndex++;
     }
 
@@ -112,12 +153,34 @@ class Pipeline: public AudioElement<T> {
       throw std::runtime_error("Asked for too many samples");
     }
 
+    #if PIPELINE_H_PROFILING
+    auto metricsIt = stepMetrics.begin();
+    #endif
+
     // set user's output buffer as final output and run stages
     steps[outputStep].out = out;
     for (const auto& step: steps) {
+
+      #if PIPELINE_H_PROFILING
+      auto timer = stopWatchSeconds();
+      #endif
+
       inputs_t<T> ins = step.in.data();
       step.elem->generate(numSamples, step.out, step.in.size(), ins);
+
+      #if PIPELINE_H_PROFILING
+      metricsIt->record(timer());
+      ++metricsIt;
+      #endif
     } 
+
+    #if PIPELINE_H_PROFILING
+    clock_t time = clock();
+    if (time >= nextReportTime) {
+      nextReportTime = time + reportInterval;
+      reportMetrics();
+    }
+    #endif
   }
 };
 

@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <ctime>
 #include <vector>
+#include <functional>
 
 class Metric;
 
@@ -17,6 +18,9 @@ public:
   TimeMetricRAII(Metric& metric);
   ~TimeMetricRAII();
 };
+
+// Get function that reports seconds since instantiation.
+std::function<float()> stopWatchSeconds();
 
 struct MetricReport {
   const float max;

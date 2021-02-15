@@ -27,11 +27,14 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
   ZSynthController synth(params);
   synth.injectMidi(channelMidi);
 
-  int periodsPerSec = params.sampleRateHz / params.bufferSampleCount;
-  int metricSeconds = 10;
-  Metric audioLatency(periodsPerSec * metricSeconds);
+  // Metrics
+  const float periodSizeSec = static_cast<float>(params.bufferSampleCount) / params.sampleRateHz;
+  const int periodsPerSec = 1 / periodSizeSec;
+  const int metricSeconds = 5;
+  const int metricsLength = periodsPerSec * metricSeconds;
+  Metric audioLatency(metricsLength);
   if (cliParams.dumpMetrics) {
-    printf("Dumping audio gen time (%d second sliding window, %d periods)\n", metricSeconds, metricSeconds * periodsPerSec);
+    printf("Dumping audio gen time (%d second sliding window, %d generations, period size %.3f sec)\n", metricSeconds, metricsLength, periodSizeSec);
   }
 
   uint32_t i = 0;

@@ -12,6 +12,13 @@ TimeMetricRAII::~TimeMetricRAII() {
   metric.record(deltaUs);
 }
 
+std::function<float()> stopWatchSeconds() {
+  clock_t start = clock();
+  return [start]() {
+    return (float)(clock() - start) / CLOCKS_PER_SEC;
+  };
+}
+
 Metric::Metric(uint32_t length): values(length) {}
 
 void Metric::record(float value) {

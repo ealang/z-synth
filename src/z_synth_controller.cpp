@@ -13,6 +13,8 @@
 
 using namespace std;
 
+static const uint32_t polyphonyCount = 32;
+
 static const float filterMinCutoffHz = 0;
 static const float filterMaxCutoffHz = 15000;
 static const float maxFmSemiToneRange = 3;

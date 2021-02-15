@@ -21,7 +21,6 @@ class MixerElement;
 
 // Wire up synth modules & midi events
 class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
-  static const uint32_t polyphonyCount = 32;
   const AudioParams params;
   PolyphonyPartitioning polyphonyPartitioning;
 
