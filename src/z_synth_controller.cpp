@@ -7,8 +7,8 @@
 #include "./elements/lowpass_filter_element.h"
 #include "./elements/mixer_element.h"
 #include "./synth_utils/generator_functions.h"
-#include "./synth_utils/linear_scale.h"
 #include "./synth_utils/midi_note_to_freq.h"
+#include "./synth_utils/scale.h"
 #include "./pipeline/pipeline_builder.h"
 
 using namespace std;
@@ -16,7 +16,7 @@ using namespace std;
 static const uint32_t polyphonyCount = 32;
 
 static const float filterMinCutoffHz = 50;
-static const float filterMaxCutoffHz = 10000;
+static const float filterMaxCutoffHz = 20000;
 static const float maxFmSemiToneRange = 3;
 static const float envelopeMinAttack = 0.01;
 static const float envelopeMaxAttack = 1;
@@ -265,7 +265,8 @@ void ZSynthController::onNRPNValueHighChange(
         mixer->setWeight(1, mix);
       }
     } else if (paramLow == PARAM_FILTER_CUTOFF) {
-      float cutoffFreq = normMidi(paramValue, filterMinCutoffHz, filterMaxCutoffHz);
+      auto scale = powerScaleClamped(3, 0, 127, filterMinCutoffHz, filterMaxCutoffHz);
+      float cutoffFreq = scale(paramValue);
       std::cout << "Set cutoff frequency to " << cutoffFreq << std::endl;
       for (auto &elem: filterElements) {
         elem->setCutoffFreq(cutoffFreq);
