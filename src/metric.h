@@ -12,7 +12,7 @@ class Metric;
  * RAII pattern to record seconds of CPU time into a metric.
  */
 class TimeMetricRAII {
-  clock_t start;
+  timespec start;
   Metric& metric;
 public:
   TimeMetricRAII(Metric& metric);

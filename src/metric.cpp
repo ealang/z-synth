@@ -3,19 +3,28 @@
 
 using namespace std;
 
+static float getSecondsElapsed(const timespec& a, const timespec &b) {
+  return (b.tv_sec - a.tv_sec) + (b.tv_nsec - a.tv_nsec) / 1e9;
+}
+
 TimeMetricRAII::TimeMetricRAII(Metric& metric): metric(metric) {
-  start = clock();
+  clock_gettime(CLOCK_MONOTONIC, &start);
 }
 
 TimeMetricRAII::~TimeMetricRAII() {
-  float deltaUs = (float)(clock() - start) / CLOCKS_PER_SEC;
-  metric.record(deltaUs);
+  timespec cur;
+  clock_gettime(CLOCK_MONOTONIC, &cur);
+  metric.record(getSecondsElapsed(start, cur));
 }
 
 std::function<float()> stopWatchSeconds() {
-  clock_t start = clock();
+  timespec start;
+  clock_gettime(CLOCK_MONOTONIC, &start);
+
   return [start]() {
-    return (float)(clock() - start) / CLOCKS_PER_SEC;
+    timespec cur;
+    clock_gettime(CLOCK_MONOTONIC, &cur);
+    return getSecondsElapsed(start, cur);
   };
 }
 
