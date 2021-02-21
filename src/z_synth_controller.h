@@ -11,40 +11,19 @@
 #include <memory>
 #include <vector>
 
-class ADSRElement;
 class AmpElement;
-class DistortionElement;
-class GeneratorElement;
-class LowpassFilterElement;
-class MidiPolyphonyAdapter;
-class MixerElement;
+class PerVoiceController;
 
 // Wire up synth modules & midi events
 class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
   const AudioParams params;
   PolyphonyPartitioning polyphonyPartitioning;
 
-  float fmSemitoneRange = 1;
-  int gen1SemitoneOffset = 0;
-  int gen2SemitoneOffset = 0;
-  float gen1FineOffset = 0;
-  float gen2FineOffset = 0;
-
-  // elements
+  std::vector<std::shared_ptr<PerVoiceController>> voiceControllers;
   std::shared_ptr<AmpElement> ampElement;
-  std::vector<std::shared_ptr<GeneratorElement>> genElements1;
-  std::vector<std::shared_ptr<GeneratorElement>> genElements2;
-  std::vector<std::shared_ptr<MixerElement>> mixerElements;
-  std::vector<std::shared_ptr<ADSRElement>> adsrAmpElements;
-  std::vector<std::shared_ptr<ADSRElement>> adsrFilterElements;
-  std::vector<std::shared_ptr<DistortionElement>> distElements;
-  std::vector<std::shared_ptr<LowpassFilterElement>> filterElements;
-  std::shared_ptr<GeneratorElement> lfoElement;
 
   // logical element/wiring
   std::shared_ptr<AudioElement<float>> _pipeline;
-
-  std::shared_ptr<AudioElement<float>> makeWiring() const;
 
   void onNoteOnEvent(unsigned char note, unsigned char vel) override;
   void onNoteOffEvent(unsigned char note) override;

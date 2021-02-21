@@ -16,7 +16,7 @@ class GeneratorElement: public AudioElement<float> {
   float _amplitude = 1;
   float _fmRange = 0;
 
-  bool isEnabled = false;
+  bool isEnabled = true;
   float time = 0;
 
 public:

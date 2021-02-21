@@ -11,128 +11,330 @@
 #include "./synth_utils/scale.h"
 #include "./pipeline/pipeline_builder.h"
 
-using namespace std;
+static constexpr uint32_t polyphonyCount = 32;
 
-static const uint32_t polyphonyCount = 32;
+static constexpr float filterMinCutoffHz = 50;
+static constexpr float filterMaxCutoffHz = 20000;
+static constexpr float maxFmSemiToneRange = 3;
+static constexpr float envelopeMinAttack = 0.01;
+static constexpr float envelopeMaxAttack = 1;
+static constexpr float envelopeMaxDecay = 1;
+static constexpr float envelopeMinRelease = 0.01;
+static constexpr float envelopeMaxRelease = 5;
+static constexpr float maxDistortionParam = 5;
+static constexpr float minLFOFrequencyHz = 0.1;
+static constexpr float maxLFOFrequencyHz = 50;
+static constexpr float maxLFOAmp = 1;
+static constexpr float maxMasterAmp = 0.05;
 
-static const float filterMinCutoffHz = 50;
-static const float filterMaxCutoffHz = 20000;
-static const float maxFmSemiToneRange = 3;
-static const float envelopeMinAttack = 0.01;
-static const float envelopeMaxAttack = 1;
-static const float envelopeMaxDecay = 1;
-static const float envelopeMinRelease = 0.01;
-static const float envelopeMaxRelease = 5;
-static const float maxDistortionParam = 5;
-static const float minLFOFrequencyHz = 0.1;
-static const float maxLFOFrequencyHz = 50;
-static const float maxLFOAmp = 1;
+static constexpr uint8_t NRPN_MSB_VALUE = 0x10;
 
-shared_ptr<AudioElement<float>> ZSynthController::makeWiring() const {
-  PipelineBuilder<float> builder;
+static constexpr uint8_t PARAM_GEN1_WAVE_TYPE     = 0x00;
+static constexpr uint8_t PARAM_GEN2_WAVE_TYPE     = 0x01;
+static constexpr uint8_t PARAM_GEN_MIX            = 0x02;
+static constexpr uint8_t PARAM_FILTER_CUTOFF      = 0x03;
+static constexpr uint8_t PARAM_GEN1_FINE_OFFSET   = 0x04;
+static constexpr uint8_t PARAM_GEN2_FINE_OFFSET   = 0x05;
+static constexpr uint8_t PARAM_AMP_ENV_ATTACK     = 0x06;
+static constexpr uint8_t PARAM_AMP_ENV_DECAY      = 0x07;
+static constexpr uint8_t PARAM_AMP_ENV_SUSTAIN    = 0x08;
+static constexpr uint8_t PARAM_AMP_ENV_RELEASE    = 0x09;
+static constexpr uint8_t PARAM_FILTER_ENV_ATTACK  = 0x0A;
+static constexpr uint8_t PARAM_FILTER_ENV_DECAY   = 0x0B;
+static constexpr uint8_t PARAM_FILTER_ENV_SUSTAIN = 0x0C;
+static constexpr uint8_t PARAM_FILTER_ENV_RELEASE = 0x0D;
+static constexpr uint8_t PARAM_DISTORTION         = 0x0E;
+static constexpr uint8_t PARAM_LFO_AMP            = 0x0F;
+static constexpr uint8_t PARAM_LFO_FREQ           = 0x10;
+static constexpr uint8_t PARAM_LFO_WAVE_TYPE      = 0x11;
+static constexpr uint8_t PARAM_MASTER_AMP         = 0x12;
+static constexpr uint8_t PARAM_GEN1_COARSE_OFFSET = 0x13;
+static constexpr uint8_t PARAM_GEN2_COARSE_OFFSET = 0x14;
 
-  for (uint32_t i = 0; i < polyphonyCount; ++i) {
+static const std::vector<std::function<float(float)>> generatorTable {
+  square_function,
+  sine_function,
+  triangle_function,
+  noise_function,
+  saw_function
+};
+
+// Monophonic pipeline
+class PerVoiceController {
+  // Component elements
+  std::shared_ptr<GeneratorElement> lfoElement;
+  std::shared_ptr<GeneratorElement> genElement1;
+  std::shared_ptr<GeneratorElement> genElement2;
+  std::shared_ptr<MixerElement> mixerElement;
+  std::shared_ptr<ADSRElement> adsrAmpElement;
+  std::shared_ptr<ADSRElement> adsrFilterElement;
+  std::shared_ptr<DistortionElement> distElement;
+  std::shared_ptr<LowpassFilterElement> filterElement;
+
+  // logical element/wiring
+  std::shared_ptr<AudioElement<float>> _pipeline;
+
+  void constructElems(AudioParams params) {
+    lfoElement =std::make_shared<GeneratorElement>(params.sampleRateHz, sine_function);
+    lfoElement->setFrequency(8);
+    lfoElement->setAmplitude(0.1);
+
+    genElement1 =std::make_shared<GeneratorElement>(params.sampleRateHz, saw_function);
+    genElement2 =std::make_shared<GeneratorElement>(params.sampleRateHz, sine_function);
+
+    uint32_t numElements = 2;
+    mixerElement =std::make_shared<MixerElement>(numElements);
+
+    adsrAmpElement =std::make_shared<ADSRElement>(params.sampleRateHz);
+    adsrAmpElement->setAttackTime(0.1);
+    adsrAmpElement->setDecayTime(0.1);
+    adsrAmpElement->setSustainLevel(.5);
+    adsrAmpElement->setReleaseTime(0.3);
+
+    adsrFilterElement =std::make_shared<ADSRElement>(params.sampleRateHz);
+    adsrFilterElement->setAttackTime(0.1);
+    adsrFilterElement->setDecayTime(0.1);
+    adsrFilterElement->setSustainLevel(0.5);
+    adsrFilterElement->setReleaseTime(0.3);
+
+    distElement =std::make_shared<DistortionElement>(2, 1, 5);
+
+    filterElement =std::make_shared<LowpassFilterElement>(params.sampleRateHz, 3500, 101);
+  }
+
+  void constructWiring(AudioParams params, uint32_t i) {
+    PipelineBuilder<float> builder;
+
+    char lfoName[20];
+    snprintf(lfoName, sizeof(lfoName), "lfo-%d", i);
+    builder.registerElem(lfoName, lfoElement);
+
     // generator1
     char gen1Name[20];
     snprintf(gen1Name, sizeof(gen1Name), "gen1-%d", i);
-    builder.registerElem(gen1Name, genElements1[i]);
+    builder.registerElem(gen1Name, genElement1);
 
     // generator2
     char gen2Name[20];
     snprintf(gen2Name, sizeof(gen2Name), "gen2-%d", i);
-    builder.registerElem(gen2Name, genElements2[i]);
+    builder.registerElem(gen2Name, genElement2);
 
     // mixer
     char mixerName[20];
     snprintf(mixerName, sizeof(mixerName), "mixer-%d", i);
-    builder.registerElem(mixerName, mixerElements[i]);
+    builder.registerElem(mixerName, mixerElement);
 
     // adsrs
     char adsrAmpName[20];
     snprintf(adsrAmpName, sizeof(adsrAmpName), "adsr-amp-%d", i);
-    builder.registerElem(adsrAmpName, adsrAmpElements[i]);
+    builder.registerElem(adsrAmpName, adsrAmpElement);
 
     char adsrFilterName[20];
     snprintf(adsrFilterName, sizeof(adsrFilterName), "adsr-filt-%d", i);
-    builder.registerElem(adsrFilterName, adsrFilterElements[i]);
-
-    // filter
-    char filterName[20];
-    snprintf(filterName, sizeof(filterName), "filter-%d", i);
-    builder.registerElem(filterName, filterElements[i]);
+    builder.registerElem(adsrFilterName, adsrFilterElement);
 
     // distortion effect
     char distName[20];
     snprintf(distName, sizeof(distName), "dist-%d", i);
-    builder.registerElem(distName, distElements[i]);
+    builder.registerElem(distName, distElement);
+
+    // filter
+    char filterName[20];
+    snprintf(filterName, sizeof(filterName), "filter-%d", i);
+    builder.registerElem(filterName, filterElement);
 
     // generator mods
-    builder.connectElems("lfo", gen1Name, genElements1[i]->fmPortNumber());
-    builder.connectElems("lfo", gen2Name, genElements2[i]->fmPortNumber());
+    builder.connectElems(lfoName, gen1Name, genElement1->fmPortNumber());
+    builder.connectElems(lfoName, gen2Name, genElement2->fmPortNumber());
 
     // filter mods
-    builder.connectElems(adsrFilterName, filterName, filterElements[i]->modPortNumber());
+    builder.connectElems(adsrFilterName, filterName, filterElement->modPortNumber());
 
-    // gen1, gen1 -> mixer -> adsr amp -> filter -> dist -> amp
-    builder.connectElems(gen1Name, mixerName, mixerElements[i]->inputPortNumber(0));
-    builder.connectElems(gen2Name, mixerName, mixerElements[i]->inputPortNumber(1));
-    builder.connectElems(mixerName, adsrAmpName, adsrAmpElements[i]->inputPortNumber());
-    builder.connectElems(adsrAmpName, filterName, filterElements[i]->inputPortNumber());
+    // gen1, gen1 -> mixer -> adsr amp -> filter -> dist
+    builder.connectElems(gen1Name, mixerName, mixerElement->inputPortNumber(0));
+    builder.connectElems(gen2Name, mixerName, mixerElement->inputPortNumber(1));
+    builder.connectElems(mixerName, adsrAmpName, adsrAmpElement->inputPortNumber());
+    builder.connectElems(adsrAmpName, filterName, filterElement->inputPortNumber());
+    builder.connectElems(filterName, distName, distElement->inputPortNumber());
 
-    builder.connectElems(filterName, distName, distElements[i]->inputPortNumber());
-    builder.connectElems(distName, "amp", ampElement->inputPortNumber(i));
+    builder.setOutputElem(distName);
+
+    _pipeline = builder.build(params.bufferSampleCount);
   }
 
-  builder.registerElem("lfo", lfoElement);
-  builder.registerElem("amp", ampElement);
-  builder.setOutputElem("amp");
+public:
 
-  return builder.build(params.bufferSampleCount);
-}
+  float fmSemitoneRange = 1;
+  int gen1SemitoneOffset = 0;
+  int gen2SemitoneOffset = 0;
+  float gen1FineOffset = 0;
+  float gen2FineOffset = 0;
+
+  PerVoiceController(AudioParams params, uint32_t i) {
+    constructElems(params);
+    constructWiring(params, i);
+  }
+
+  std::shared_ptr<AudioElement<float>> pipeline() const {
+    return _pipeline;
+  }
+
+  void onNoteOnEvent(unsigned char note, unsigned char) {
+    float gen1Offset = gen1SemitoneOffset + gen1FineOffset;
+    float gen2Offset = gen2SemitoneOffset + gen2FineOffset;
+
+    float frequency1 = midiNoteToFreq(note + gen1Offset);
+    float frequency2 = midiNoteToFreq(note + gen2Offset);
+    float frequencyModRange1 = (midiNoteToFreq(note + gen1Offset + 1) - frequency1) * fmSemitoneRange;
+    float frequencyModRange2 = (midiNoteToFreq(note + gen2Offset + 1) - frequency2) * fmSemitoneRange;
+    genElement1->setFrequency(frequency1);
+    genElement2->setFrequency(frequency2);
+    genElement1->setFMLinearRange(frequencyModRange1);
+    genElement2->setFMLinearRange(frequencyModRange2);
+
+    adsrAmpElement->trigger();
+    adsrFilterElement->trigger();
+  }
+
+  void onNoteOffEvent() {
+    adsrAmpElement->release();
+    adsrFilterElement->release();
+  }
+
+  void onNRPNValueHighChange(
+    unsigned char paramNumber,
+    unsigned char paramValue
+  ) {
+    const auto normMidi = [](float val, float start = 0, float end = 1) {
+      return linearScaleClamped(0, 127, start, end)(val);
+    };
+
+    const auto normMidiEven = [](float val, float start = 0, float end = 1) {
+      return linearScaleClamped(0, 128, start, end)(val);
+    };
+
+    const auto clamp = [](uint8_t val, uint8_t min, uint8_t max) {
+      if (val < min) {
+        return min;
+      }
+      if (val > max) {
+        return max;
+      }
+      return val;
+    };
+
+    if (paramNumber == PARAM_GEN1_WAVE_TYPE) {
+      // Generator 1 wave type
+      if (paramValue < generatorTable.size()) {
+        std::cout << "Set gen 1 wave " << static_cast<int>(paramValue) << std::endl;
+        genElement1->setValue(generatorTable[paramValue]);
+      }
+    } else if (paramNumber == PARAM_GEN2_WAVE_TYPE) {
+      // Generator 2 wave type
+      if (paramValue < generatorTable.size()) {
+        std::cout << "Set gen 2 wave " << static_cast<int>(paramValue) << std::endl;
+        genElement2->setValue(generatorTable[paramValue]);
+      }
+    } else if (paramNumber == PARAM_GEN_MIX) {
+      // Generator 1-2 mix
+      const float mix = normMidi(paramValue);
+      std::cout << "Set mix to " << mix << std::endl;
+      mixerElement->setWeight(0, 1 - mix);
+      mixerElement->setWeight(1, mix);
+    } else if (paramNumber == PARAM_FILTER_CUTOFF) {
+      auto scale = powerScaleClamped(3, 0, 127, filterMinCutoffHz, filterMaxCutoffHz);
+      float cutoffFreq = scale(paramValue);
+      std::cout << "Set cutoff frequency to " << cutoffFreq << std::endl;
+      filterElement->setCutoffFreq(cutoffFreq);
+    } else if (paramNumber == PARAM_GEN1_FINE_OFFSET) {
+      gen1FineOffset = normMidiEven(paramValue, -1, 1);
+      std::cout << "Set gen 1 fine offset to " << gen1FineOffset << std::endl;
+    } else if (paramNumber == PARAM_GEN1_COARSE_OFFSET) {
+      gen1SemitoneOffset = static_cast<int>(clamp(paramValue, 0, 48)) - 24;
+      std::cout << "Set gen 1 semitone offset to " << gen1SemitoneOffset << std::endl;
+    } else if (paramNumber == PARAM_GEN2_FINE_OFFSET) {
+      gen2FineOffset = normMidiEven(paramValue, -1, 1);
+      std::cout << "Set gen 2 fine offset to " << gen2FineOffset << std::endl;
+    } else if (paramNumber == PARAM_GEN2_COARSE_OFFSET) {
+      gen2SemitoneOffset = static_cast<int>(clamp(paramValue, 0, 48)) - 24;
+      std::cout << "Set gen 2 semitone offset to " << gen2SemitoneOffset << std::endl;
+    } else if (paramNumber == PARAM_AMP_ENV_ATTACK) {
+      float attack = normMidi(paramValue, envelopeMinAttack, envelopeMaxAttack);
+      std::cout << "Set amp attack time to " << attack << std::endl;
+      adsrAmpElement->setAttackTime(attack);
+    } else if (paramNumber == PARAM_AMP_ENV_DECAY) {
+      float decay = normMidi(paramValue) * envelopeMaxDecay;
+      std::cout << "Set amp decay time to " << decay << std::endl;
+      adsrAmpElement->setDecayTime(decay);
+    } else if (paramNumber == PARAM_AMP_ENV_SUSTAIN) {
+      float sustain = normMidi(paramValue);
+      std::cout << "Set amp sustain level to " << sustain << std::endl;
+      adsrAmpElement->setSustainLevel(sustain);
+    } else if (paramNumber == PARAM_AMP_ENV_RELEASE) {
+      float release = normMidi(paramValue, envelopeMinRelease, envelopeMaxRelease);
+      std::cout << "Set amp release time to " << release << std::endl;
+      adsrAmpElement->setReleaseTime(release);
+    } else if (paramNumber == PARAM_FILTER_ENV_ATTACK) {
+      float attack = normMidi(paramValue, envelopeMinAttack, envelopeMaxAttack);
+      std::cout << "Set filter attack time to " << attack << std::endl;
+      adsrFilterElement->setAttackTime(attack);
+    } else if (paramNumber == PARAM_FILTER_ENV_DECAY) {
+      float decay = normMidi(paramValue) * envelopeMaxDecay;
+      std::cout << "Set filter decay time to " << decay << std::endl;
+      adsrFilterElement->setDecayTime(decay);
+    } else if (paramNumber == PARAM_FILTER_ENV_SUSTAIN) {
+      float sustain = normMidi(paramValue);
+      std::cout << "Set filter sustain level to " << sustain << std::endl;
+      adsrFilterElement->setSustainLevel(sustain);
+    } else if (paramNumber == PARAM_FILTER_ENV_RELEASE) {
+      float release = normMidi(paramValue, envelopeMinRelease, envelopeMaxRelease);
+      std::cout << "Set filter release time to " << release << std::endl;
+      adsrFilterElement->setReleaseTime(release);
+    } else if (paramNumber == PARAM_DISTORTION) {
+      float value = normMidi(paramValue) * maxDistortionParam;
+      std::cout << "Set distortion param to " << value << std::endl;
+      distElement->setDefaultAmount(value);
+    } else if (paramNumber == PARAM_LFO_AMP) {
+      float value = normMidi(paramValue) * maxLFOAmp;
+      std::cout << "Set LFO amp to " << value << std::endl;
+      lfoElement->setAmplitude(value);
+    } else if (paramNumber == PARAM_LFO_FREQ) {
+      float value = normMidi(paramValue, minLFOFrequencyHz, maxLFOFrequencyHz);
+      std::cout << "Set LFO frequency to " << value << std::endl;
+      lfoElement->setFrequency(value);
+    } else if (paramNumber == PARAM_LFO_WAVE_TYPE) {
+      if (paramValue < generatorTable.size()) {
+        std::cout << "Set LFO wave " << static_cast<int>(paramValue) << std::endl;
+        lfoElement->setValue(generatorTable[paramValue]);
+      }
+    }
+  }
+};
 
 ZSynthController::ZSynthController(AudioParams params)
   : params(params),
     polyphonyPartitioning(polyphonyCount),
-    ampElement(make_shared<AmpElement>(0.1)),
-    lfoElement(make_shared<GeneratorElement>(params.sampleRateHz, noise_function))
+    ampElement(std::make_shared<AmpElement>(maxMasterAmp * 0.5))
 {
+  PipelineBuilder<float> builder;
+
+  // Per voice elements
   for (uint32_t i = 0; i < polyphonyCount; ++i) {
-    auto genElem1 = make_shared<GeneratorElement>(params.sampleRateHz, saw_function);
-    genElem1->setAmplitude(0.1);
-    genElem1->setEnabled(true);
-    genElements1.emplace_back(genElem1);
+    // Create element
+    auto voiceController = std::make_shared<PerVoiceController>(params, i);
+    voiceControllers.emplace_back(voiceController);
 
-    auto genElem2 = make_shared<GeneratorElement>(params.sampleRateHz, sine_function);
-    genElem2->setAmplitude(0.1);
-    genElem2->setEnabled(true);
-    genElements2.emplace_back(genElem2);
-
-    auto mixerElem = make_shared<MixerElement>(2);
-    mixerElements.emplace_back(mixerElem);
-
-    auto adsrFilterElem = make_shared<ADSRElement>(params.sampleRateHz);
-    adsrFilterElem->setAttackTime(0);
-    adsrFilterElem->setDecayTime(.2);
-    adsrFilterElem->setSustainLevel(.5);
-    adsrFilterElem->setReleaseTime(0.3);
-    adsrFilterElements.emplace_back(adsrFilterElem);
-
-    auto adsrAmpElem = make_shared<ADSRElement>(params.sampleRateHz);
-    adsrAmpElem->setAttackTime(0.1);
-    adsrAmpElem->setDecayTime(0.1);
-    adsrAmpElem->setSustainLevel(0.5);
-    adsrAmpElem->setReleaseTime(0.3);
-    adsrAmpElements.emplace_back(adsrAmpElem);
-
-    distElements.emplace_back(make_shared<DistortionElement>(2, 1, 5));
-
-    filterElements.emplace_back(make_shared<LowpassFilterElement>(params.sampleRateHz, 3500, 101));
+    // Wire up element
+    char voiceName[20];
+    snprintf(voiceName, sizeof(voiceName), "voice-%d", i);
+    builder.registerElem(voiceName, voiceController->pipeline());
+    builder.connectElems(voiceName, "amp", ampElement->inputPortNumber(i));
   }
 
-  lfoElement->setFrequency(8);
-  lfoElement->setEnabled(true);
+  builder.registerElem("amp", ampElement);
+  builder.setOutputElem("amp");
 
-  _pipeline = makeWiring();
+  _pipeline = builder.build(params.bufferSampleCount);
 }
 
 std::shared_ptr<AudioElement<float>> ZSynthController::pipeline() const {
@@ -144,30 +346,15 @@ void ZSynthController::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
   MidiNRPNListener::injectMidi(midi);
 }
 
-void ZSynthController::onNoteOnEvent(unsigned char note, unsigned char) {
+void ZSynthController::onNoteOnEvent(unsigned char note, unsigned char velocity) {
   uint32_t voice = polyphonyPartitioning.onNoteOnEvent(note);
-
-  float gen1Offset = gen1SemitoneOffset + gen1FineOffset;
-  float gen2Offset = gen2SemitoneOffset + gen2FineOffset;
-
-  float frequency1 = midiNoteToFreq(note + gen1Offset);
-  float frequency2 = midiNoteToFreq(note + gen2Offset);
-  float frequencyModRange1 = (midiNoteToFreq(note + gen1Offset + 1) - frequency1) * fmSemitoneRange;
-  float frequencyModRange2 = (midiNoteToFreq(note + gen2Offset + 1) - frequency2) * fmSemitoneRange;
-  genElements1[voice]->setFrequency(frequency1);
-  genElements2[voice]->setFrequency(frequency2);
-  genElements1[voice]->setFMLinearRange(frequencyModRange1);
-  genElements2[voice]->setFMLinearRange(frequencyModRange2);
-
-  adsrAmpElements[voice]->trigger();
-  adsrFilterElements[voice]->trigger();
+  voiceControllers[voice]->onNoteOnEvent(note, velocity);
 }
 
 void ZSynthController::onNoteOffEvent(unsigned char note) {
   uint32_t voice = polyphonyPartitioning.onNoteOffEvent(note);
   if (voice < polyphonyCount) {
-    adsrAmpElements[voice]->release();
-    adsrFilterElements[voice]->release();
+    voiceControllers[voice]->onNoteOffEvent();
   }
 }
 
@@ -178,8 +365,7 @@ void ZSynthController::onSustainOnEvent() {
 void ZSynthController::onSustainOffEvent() {
   for(const auto &voice: polyphonyPartitioning.onSustainOffEvent()) {
     if (voice < polyphonyCount) {
-      adsrAmpElements[voice]->release();
-      adsrFilterElements[voice]->release();
+      voiceControllers[voice]->onNoteOffEvent();
     }
   }
 }
@@ -189,171 +375,15 @@ void ZSynthController::onNRPNValueHighChange(
   unsigned char paramLow,
   unsigned char paramValue
 ) {
-  static vector<function<float(float)>> generatorTable {
-    square_function,
-    sine_function,
-    triangle_function,
-    noise_function,
-    saw_function
-  };
-
-  const uint8_t NRPN_MSB_VALUE = 0x10;
-
-  const uint8_t PARAM_GEN1_WAVE_TYPE     = 0x00;
-  const uint8_t PARAM_GEN2_WAVE_TYPE     = 0x01;
-  const uint8_t PARAM_GEN_MIX            = 0x02;
-  const uint8_t PARAM_FILTER_CUTOFF      = 0x03;
-  const uint8_t PARAM_GEN1_FINE_OFFSET   = 0x04;
-  const uint8_t PARAM_GEN2_FINE_OFFSET   = 0x05;
-  const uint8_t PARAM_AMP_ENV_ATTACK     = 0x06;
-  const uint8_t PARAM_AMP_ENV_DECAY      = 0x07;
-  const uint8_t PARAM_AMP_ENV_SUSTAIN    = 0x08;
-  const uint8_t PARAM_AMP_ENV_RELEASE    = 0x09;
-  const uint8_t PARAM_FILTER_ENV_ATTACK  = 0x0A;
-  const uint8_t PARAM_FILTER_ENV_DECAY   = 0x0B;
-  const uint8_t PARAM_FILTER_ENV_SUSTAIN = 0x0C;
-  const uint8_t PARAM_FILTER_ENV_RELEASE = 0x0D;
-  const uint8_t PARAM_DISTORTION         = 0x0E;
-  const uint8_t PARAM_LFO_AMP            = 0x0F;
-  const uint8_t PARAM_LFO_FREQ           = 0x10;
-  const uint8_t PARAM_LFO_WAVE_TYPE      = 0x11;
-  const uint8_t PARAM_MASTER_AMP         = 0x12;
-  const uint8_t PARAM_GEN1_COARSE_OFFSET = 0x13;
-  const uint8_t PARAM_GEN2_COARSE_OFFSET = 0x14;
-
-  const auto normMidi = [](float val, float start = 0, float end = 1) {
-    return linearScaleClamped(0, 127, start, end)(val);
-  };
-
-  const auto normMidiEven = [](float val, float start = 0, float end = 1) {
-    return linearScaleClamped(0, 128, start, end)(val);
-  };
-
-  const auto clamp = [](uint8_t val, uint8_t min, uint8_t max) {
-    if (val < min) {
-      return min;
-    }
-    if (val > max) {
-      return max;
-    }
-    return val;
-  };
-
   if (paramHigh == NRPN_MSB_VALUE) {
-    if (paramLow == PARAM_GEN1_WAVE_TYPE) {
-      // Generator 1 wave type
-      if (paramValue < generatorTable.size()) {
-        std::cout << "Set gen 1 wave " << static_cast<int>(paramValue) << std::endl;
-        for (auto &elem: genElements1) {
-          elem->setValue(generatorTable[paramValue]);
-        }
-      }
-    } else if (paramLow == PARAM_GEN2_WAVE_TYPE) {
-      // Generator 2 wave type
-      if (paramValue < generatorTable.size()) {
-        std::cout << "Set gen 2 wave " << static_cast<int>(paramValue) << std::endl;
-        for (auto &elem: genElements2) {
-          elem->setValue(generatorTable[paramValue]);
-        }
-      }
-    } else if (paramLow == PARAM_GEN_MIX) {
-      // Generator 1-2 mix
-      const float mix = normMidi(paramValue);
-      std::cout << "Set mix to " << mix << std::endl;
-      for (auto &mixer: mixerElements) {
-        mixer->setWeight(0, 1 - mix);
-        mixer->setWeight(1, mix);
-      }
-    } else if (paramLow == PARAM_FILTER_CUTOFF) {
-      auto scale = powerScaleClamped(3, 0, 127, filterMinCutoffHz, filterMaxCutoffHz);
-      float cutoffFreq = scale(paramValue);
-      std::cout << "Set cutoff frequency to " << cutoffFreq << std::endl;
-      for (auto &elem: filterElements) {
-        elem->setCutoffFreq(cutoffFreq);
-      }
-    } else if (paramLow == PARAM_GEN1_FINE_OFFSET) {
-      gen1FineOffset = normMidiEven(paramValue, -1, 1);
-      std::cout << "Set gen 1 fine offset to " << gen1FineOffset << std::endl;
-    } else if (paramLow == PARAM_GEN1_COARSE_OFFSET) {
-      gen1SemitoneOffset = static_cast<int>(clamp(paramValue, 0, 48)) - 24;
-      std::cout << "Set gen 1 semitone offset to " << gen1SemitoneOffset << std::endl;
-    } else if (paramLow == PARAM_GEN2_FINE_OFFSET) {
-      gen2FineOffset = normMidiEven(paramValue, -1, 1);
-      std::cout << "Set gen 2 fine offset to " << gen2FineOffset << std::endl;
-    } else if (paramLow == PARAM_GEN2_COARSE_OFFSET) {
-      gen2SemitoneOffset = static_cast<int>(clamp(paramValue, 0, 48)) - 24;
-      std::cout << "Set gen 2 semitone offset to " << gen2SemitoneOffset << std::endl;
-    } else if (paramLow == PARAM_AMP_ENV_ATTACK) {
-      float attack = normMidi(paramValue, envelopeMinAttack, envelopeMaxAttack);
-      std::cout << "Set amp attack time to " << attack << std::endl;
-      for (auto &elem: adsrAmpElements) {
-        elem->setAttackTime(attack);
-      }
-    } else if (paramLow == PARAM_AMP_ENV_DECAY) {
-      float decay = normMidi(paramValue) * envelopeMaxDecay;
-      std::cout << "Set amp decay time to " << decay << std::endl;
-      for (auto &elem: adsrAmpElements) {
-        elem->setDecayTime(decay);
-      }
-    } else if (paramLow == PARAM_AMP_ENV_SUSTAIN) {
-      float sustain = normMidi(paramValue);
-      std::cout << "Set amp sustain level to " << sustain << std::endl;
-      for (auto &elem: adsrAmpElements) {
-        elem->setSustainLevel(sustain);
-      }
-    } else if (paramLow == PARAM_AMP_ENV_RELEASE) {
-      float release = normMidi(paramValue, envelopeMinRelease, envelopeMaxRelease);
-      std::cout << "Set amp release time to " << release << std::endl;
-      for (auto &elem: adsrAmpElements) {
-        elem->setReleaseTime(release);
-      }
-    } else if (paramLow == PARAM_FILTER_ENV_ATTACK) {
-      float attack = normMidi(paramValue, envelopeMinAttack, envelopeMaxAttack);
-      std::cout << "Set filter attack time to " << attack << std::endl;
-      for (auto &elem: adsrFilterElements) {
-        elem->setAttackTime(attack);
-      }
-    } else if (paramLow == PARAM_FILTER_ENV_DECAY) {
-      float decay = normMidi(paramValue) * envelopeMaxDecay;
-      std::cout << "Set filter decay time to " << decay << std::endl;
-      for (auto &elem: adsrFilterElements) {
-        elem->setDecayTime(decay);
-      }
-    } else if (paramLow == PARAM_FILTER_ENV_SUSTAIN) {
-      float sustain = normMidi(paramValue);
-      std::cout << "Set filter sustain level to " << sustain << std::endl;
-      for (auto &elem: adsrFilterElements) {
-        elem->setSustainLevel(sustain);
-      }
-    } else if (paramLow == PARAM_FILTER_ENV_RELEASE) {
-      float release = normMidi(paramValue, envelopeMinRelease, envelopeMaxRelease);
-      std::cout << "Set filter release time to " << release << std::endl;
-      for (auto &elem: adsrFilterElements) {
-        elem->setReleaseTime(release);
-      }
-    } else if (paramLow == PARAM_DISTORTION) {
-      float value = normMidi(paramValue) * maxDistortionParam;
-      std::cout << "Set distortion param to " << value << std::endl;
-      for (auto &elem: distElements) {
-        elem->setDefaultAmount(value);
-      }
-    } else if (paramLow == PARAM_LFO_AMP) {
-      float value = normMidi(paramValue) * maxLFOAmp;
-      std::cout << "Set LFO amp to " << value << std::endl;
-      lfoElement->setAmplitude(value);
-    } else if (paramLow == PARAM_LFO_FREQ) {
-      float value = normMidi(paramValue, minLFOFrequencyHz, maxLFOFrequencyHz);
-      std::cout << "Set LFO frequency to " << value << std::endl;
-      lfoElement->setFrequency(value);
-    } else if (paramLow == PARAM_LFO_WAVE_TYPE) {
-      if (paramValue < generatorTable.size()) {
-        std::cout << "Set LFO wave " << static_cast<int>(paramValue) << std::endl;
-        lfoElement->setValue(generatorTable[paramValue]);
-      }
-    } else if (paramLow == PARAM_MASTER_AMP) {
-      float value = normMidi(paramValue);
+    if (paramLow == PARAM_MASTER_AMP) {
+      float value = paramValue / 127. * maxMasterAmp;
       std::cout << "Set master amp " << value << std::endl;
       ampElement->setAmp(value);
+    } else {
+      for (auto &voice: voiceControllers) {
+        voice->onNRPNValueHighChange(paramLow, paramValue);
+      }
     }
   }
 }
