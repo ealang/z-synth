@@ -13,6 +13,8 @@
 
 using namespace std;
 
+static uint32_t constexpr polyphonyCount = 32;
+
 void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLIParams cliParams) {
   mutex lock;
 
@@ -25,7 +27,19 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
     tapSub = midiTapSubscription(channelMidi);
   }
 
-  ZSynthController synth(params);
+  uint32_t threadCount = max(
+    min(
+      cliParams.threadCount == 0 ?
+        thread::hardware_concurrency() :
+        cliParams.threadCount,
+      polyphonyCount
+    ),
+    static_cast<uint32_t>(1)
+  );
+
+  printf("Using %d render threads\n", threadCount);
+
+  ZSynthController synth(params, polyphonyCount, threadCount);
   synth.injectMidi(channelMidi);
 
   // Metrics
@@ -35,7 +49,7 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
   const int metricsLength = periodsPerSec * metricSeconds;
   Metric audioLatency(metricsLength);
   if (cliParams.dumpMetrics) {
-    printf("Dumping audio gen time (%d second sliding window, %d generations, period size %.3f sec)\n", metricSeconds, metricsLength, periodSizeSec);
+    printf("Dumping period render time (%d second history, %d samples)\n", metricSeconds, metricsLength);
   }
 
   uint32_t i = 0;
@@ -47,7 +61,7 @@ void loop(AudioParams params, snd_pcm_t* audioDevice, snd_seq_t* midiDevice, CLI
     }
 
     i += 1;
-    if (cliParams.dumpMetrics && (i % periodsPerSec) == 0) {
+    if (cliParams.dumpMetrics && (i % metricsLength) == 0) {
       auto report = audioLatency.report();
       printf("Audio gen time: max=%.3fmS p99=%.3fmS p75=%.3fmS\n",
         report.max * 1000,

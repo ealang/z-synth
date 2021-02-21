@@ -10,6 +10,7 @@ static void help(const CLIParams& params) {
     "-b,--buffer       buffer size in ms (default: %d)\n"
     "-p,--period       period size in ms (default: %d)\n"
     "-c,--channels     number of channels (default: %d)\n"
+    "-t,--threads      number of threads (default: num cores)\n"
     "-d,--dump-midi    print midi messages\n"
     "-m,--dump-metrics print performance metrics\n"
     "\n",
@@ -31,6 +32,7 @@ CLIParams parseArgs(int argc, char *argv[]) {
     {"buffer", 1, NULL, 'b'},
     {"period", 1, NULL, 'p'},
     {"channels", 1, NULL, 'c'},
+    {"threads", 1, NULL, 't'},
     {"dump-midi", 0, NULL, 'd'},
     {"dump-metrics", 0, NULL, 'm'},
     {NULL, 0, NULL, 0},
@@ -38,7 +40,7 @@ CLIParams parseArgs(int argc, char *argv[]) {
   bool showHelp = false;
   while (1) {
     int c;
-    if ((c = getopt_long(argc, argv, "hD:r:b:p:c:dm", long_option, NULL)) < 0)
+    if ((c = getopt_long(argc, argv, "hD:r:b:p:c:t:dm", long_option, NULL)) < 0)
       break;
     switch (c) {
       case 'h':
@@ -58,6 +60,9 @@ CLIParams parseArgs(int argc, char *argv[]) {
         break;
       case 'c':
         params.channelCount = atoi(optarg);
+        break;
+      case 't':
+        params.threadCount = atoi(optarg);
         break;
       case 'd':
         params.dumpMidi = true;

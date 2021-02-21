@@ -17,6 +17,7 @@ class ThreadedMixerElement;
 // Wire up synth modules & midi events
 class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
   const AudioParams params;
+  const uint32_t polyphony;
   PolyphonyPartitioning polyphonyPartitioning;
 
   std::vector<std::shared_ptr<PerVoiceController>> voiceControllers;
@@ -33,7 +34,7 @@ class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
   ) override;
 
 public:
-  ZSynthController(AudioParams params);
+  ZSynthController(AudioParams params, uint32_t polyphony, uint32_t numThreads);
   void injectMidi(Rx::observable<const snd_seq_event_t*>);
 
   std::shared_ptr<AudioElement<float>> pipeline() const;

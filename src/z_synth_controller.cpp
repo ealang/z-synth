@@ -12,8 +12,6 @@
 #include "./synth_utils/scale.h"
 #include "./pipeline/pipeline_builder.h"
 
-static constexpr uint32_t polyphonyCount = 32;
-
 static constexpr float filterMinCutoffHz = 50;
 static constexpr float filterMaxCutoffHz = 20000;
 static constexpr float maxFmSemiToneRange = 3;
@@ -312,19 +310,19 @@ public:
   }
 };
 
-ZSynthController::ZSynthController(AudioParams params)
+ZSynthController::ZSynthController(AudioParams params, uint32_t polyphony, uint32_t numThreads)
   : params(params),
-    polyphonyPartitioning(polyphonyCount)
+    polyphony(polyphony),
+    polyphonyPartitioning(polyphony)
 {
 
   std::vector<std::shared_ptr<AudioElement<float>>> elements;
-  for (uint32_t i = 0; i < polyphonyCount; ++i) {
+  for (uint32_t i = 0; i < polyphony; ++i) {
     auto voiceController = std::make_shared<PerVoiceController>(params, i);
     voiceControllers.emplace_back(voiceController);
     elements.emplace_back(voiceController->pipeline());
   }
 
-  uint32_t numThreads = 16;
   mixerElement = std::make_shared<ThreadedMixerElement>(
     params.bufferSampleCount,
     numThreads,
@@ -349,7 +347,7 @@ void ZSynthController::onNoteOnEvent(unsigned char note, unsigned char velocity)
 
 void ZSynthController::onNoteOffEvent(unsigned char note) {
   uint32_t voice = polyphonyPartitioning.onNoteOffEvent(note);
-  if (voice < polyphonyCount) {
+  if (voice < polyphony) {
     voiceControllers[voice]->onNoteOffEvent();
   }
 }
@@ -360,7 +358,7 @@ void ZSynthController::onSustainOnEvent() {
 
 void ZSynthController::onSustainOffEvent() {
   for(const auto &voice: polyphonyPartitioning.onSustainOffEvent()) {
-    if (voice < polyphonyCount) {
+    if (voice < polyphony) {
       voiceControllers[voice]->onNoteOffEvent();
     }
   }

@@ -12,6 +12,7 @@ struct CLIParams {
   uint32_t bufferTimeMs = 10;
   uint32_t periodTimeMs = 5;
   uint32_t channelCount = 2;
+  uint32_t threadCount = 0;
   bool dumpMidi = false;
   bool dumpMetrics = false;
 };
