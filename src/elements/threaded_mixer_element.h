@@ -6,7 +6,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -18,7 +17,6 @@ class ThreadedMixerElement: public AudioElement<float> {
   std::vector<std::thread> _threads;
   std::vector<float> _outputBuffers;
   std::vector<std::shared_ptr<AudioElement<float>>> _elements;
-  std::mutex mutex;
 
   std::shared_ptr<SharedState> _state;
 

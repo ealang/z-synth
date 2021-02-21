@@ -3,16 +3,22 @@
 #include <atomic>
 #include <condition_variable>
 #include <functional>
+#include <mutex>
 
 static constexpr uint32_t initGenerationFlag = 0;
 
 struct SharedState {
-  std::condition_variable workerCv;
-  std::condition_variable producerCv;
+  std::mutex workMutex;
+  std::mutex resultMutex;
+
+  std::condition_variable workCv;
+  std::condition_variable resultCv;
+
   std::vector<std::function<void()>> work;
+
   bool shouldExit;
-  std::atomic<uint32_t> generationFlag;
-  std::atomic<uint32_t> workRemaining;
+  uint32_t generationFlag;
+  uint32_t workRemaining;
 
   SharedState():
     shouldExit(false),
@@ -21,19 +27,18 @@ struct SharedState {
 };
 
 static void workerThreadMain(uint32_t threadId, uint32_t numThreads, SharedState* state) {
-  std::mutex mutex;
 
   uint32_t lastGenerationFlag = initGenerationFlag;
 
-  auto workReady = [state, &lastGenerationFlag]() {
+  auto shouldWake = [state, &lastGenerationFlag]() {
     return state->generationFlag != lastGenerationFlag || state->shouldExit;
   };
 
   while (!state->shouldExit) {
     // Wait for work
     {
-      std::unique_lock<std::mutex> lock(mutex);
-      state->workerCv.wait(lock, workReady);
+      std::unique_lock<std::mutex> lock(state->workMutex);
+      state->workCv.wait(lock, shouldWake);
     }
     if (state->shouldExit) {
       break;
@@ -47,11 +52,15 @@ static void workerThreadMain(uint32_t threadId, uint32_t numThreads, SharedState
     }
 
     // Notify requester
-    if (state->workRemaining == 0) {
-      throw std::runtime_error("invalid state");
-    }
-    if (--state->workRemaining == 0) {
-      state->producerCv.notify_one();
+    {
+      std::unique_lock<std::mutex> lock(state->resultMutex);
+      if (state->workRemaining == 0) {
+        throw std::runtime_error("invalid state");
+      }
+      if (--state->workRemaining == 0) {
+        lock.unlock();
+        state->resultCv.notify_one();
+      }
     }
   }
 }
@@ -85,7 +94,7 @@ ThreadedMixerElement::ThreadedMixerElement(
 
 ThreadedMixerElement::~ThreadedMixerElement() {
   _state->shouldExit = true;
-  _state->workerCv.notify_all();
+  _state->workCv.notify_all();
   for (auto &thread: _threads) {
     thread.join();
   }
@@ -102,14 +111,17 @@ void ThreadedMixerElement::setAmp(float amp) {
 void ThreadedMixerElement::generate(uint32_t numSamples, float* out, uint32_t, inputs_t<float>) {
   const uint32_t numElements = _elements.size();
 
-  _state->workRemaining = _threads.size();
-  ++_state->generationFlag;
+  {
+    std::unique_lock<std::mutex> lock(_state->workMutex);
+    _state->workRemaining = _threads.size();
+    ++_state->generationFlag;
+  }
 
-  _state->workerCv.notify_all();
+  _state->workCv.notify_all();
 
   {
-    std::unique_lock<std::mutex> lock(mutex);
-    _state->producerCv.wait(lock, [this]() {
+    std::unique_lock<std::mutex> lock(_state->resultMutex);
+    _state->resultCv.wait(lock, [this]() {
       return _state->workRemaining == 0;
     });
   }
