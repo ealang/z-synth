@@ -11,8 +11,8 @@
 #include <memory>
 #include <vector>
 
-class AmpElement;
 class PerVoiceController;
+class ThreadedMixerElement;
 
 // Wire up synth modules & midi events
 class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
@@ -20,10 +20,7 @@ class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
   PolyphonyPartitioning polyphonyPartitioning;
 
   std::vector<std::shared_ptr<PerVoiceController>> voiceControllers;
-  std::shared_ptr<AmpElement> ampElement;
-
-  // logical element/wiring
-  std::shared_ptr<AudioElement<float>> _pipeline;
+  std::shared_ptr<ThreadedMixerElement> mixerElement;
 
   void onNoteOnEvent(unsigned char note, unsigned char vel) override;
   void onNoteOffEvent(unsigned char note) override;

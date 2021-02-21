@@ -6,6 +6,7 @@
 #include "./elements/generator_element.h"
 #include "./elements/lowpass_filter_element.h"
 #include "./elements/mixer_element.h"
+#include "./elements/threaded_mixer_element.h"
 #include "./synth_utils/generator_functions.h"
 #include "./synth_utils/midi_note_to_freq.h"
 #include "./synth_utils/scale.h"
@@ -313,32 +314,27 @@ public:
 
 ZSynthController::ZSynthController(AudioParams params)
   : params(params),
-    polyphonyPartitioning(polyphonyCount),
-    ampElement(std::make_shared<AmpElement>(maxMasterAmp * 0.5))
+    polyphonyPartitioning(polyphonyCount)
 {
-  PipelineBuilder<float> builder;
 
-  // Per voice elements
+  std::vector<std::shared_ptr<AudioElement<float>>> elements;
   for (uint32_t i = 0; i < polyphonyCount; ++i) {
-    // Create element
     auto voiceController = std::make_shared<PerVoiceController>(params, i);
     voiceControllers.emplace_back(voiceController);
-
-    // Wire up element
-    char voiceName[20];
-    snprintf(voiceName, sizeof(voiceName), "voice-%d", i);
-    builder.registerElem(voiceName, voiceController->pipeline());
-    builder.connectElems(voiceName, "amp", ampElement->inputPortNumber(i));
+    elements.emplace_back(voiceController->pipeline());
   }
 
-  builder.registerElem("amp", ampElement);
-  builder.setOutputElem("amp");
-
-  _pipeline = builder.build(params.bufferSampleCount);
+  uint32_t numThreads = 16;
+  mixerElement = std::make_shared<ThreadedMixerElement>(
+    params.bufferSampleCount,
+    numThreads,
+    elements,
+    maxMasterAmp * 0.5f
+  );
 }
 
 std::shared_ptr<AudioElement<float>> ZSynthController::pipeline() const {
-  return _pipeline;
+  return mixerElement;
 }
 
 void ZSynthController::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
@@ -379,7 +375,7 @@ void ZSynthController::onNRPNValueHighChange(
     if (paramLow == PARAM_MASTER_AMP) {
       float value = paramValue / 127. * maxMasterAmp;
       std::cout << "Set master amp " << value << std::endl;
-      ampElement->setAmp(value);
+      mixerElement->setAmp(value);
     } else {
       for (auto &voice: voiceControllers) {
         voice->onNRPNValueHighChange(paramLow, paramValue);
