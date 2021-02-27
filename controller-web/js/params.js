@@ -2,7 +2,7 @@ const NRPN_MSB_VALUE = 0x10;
 
 const PARAM_GEN1_WAVE_TYPE     = 0x00;
 const PARAM_GEN2_WAVE_TYPE     = 0x01;
-const PARAM_GEN_MIX            = 0x02;
+const PARAM_GEN1_AMP           = 0x02;
 const PARAM_FILTER_CUTOFF      = 0x03;
 const PARAM_GEN1_FINE_OFFSET   = 0x04;
 const PARAM_GEN2_FINE_OFFSET   = 0x05;
@@ -21,18 +21,31 @@ const PARAM_LFO_WAVE_TYPE      = 0x11;
 const PARAM_MASTER_AMP         = 0x12;
 const PARAM_GEN1_COARSE_OFFSET = 0x13;
 const PARAM_GEN2_COARSE_OFFSET = 0x14;
+const PARAM_GEN3_FINE_OFFSET   = 0x15;
+const PARAM_GEN3_COARSE_OFFSET = 0x16;
+const PARAM_GEN3_WAVE_TYPE     = 0x17;
+const PARAM_GEN2_AMP           = 0x18;
+const PARAM_GEN3_AMP           = 0x19;
 
-const PARAM_WAVE_OPTIONS = ["square", "sine", "triangle", "noise", "saw"];
+const PARAM_WAVE_OPTIONS = ["square", "sine", "triangle", "noise", "saw", "noise samp 8", "reverse saw"];
 
 const DEFAULT_PARAM_VALUES = {
   [PARAM_GEN1_WAVE_TYPE]: PARAM_WAVE_OPTIONS[1],
   [PARAM_GEN2_WAVE_TYPE]: PARAM_WAVE_OPTIONS[4],
-  [PARAM_GEN_MIX]: 0.5,
+  [PARAM_GEN3_WAVE_TYPE]: PARAM_WAVE_OPTIONS[1],
+
+  [PARAM_GEN1_AMP]: 1,
+  [PARAM_GEN2_AMP]: 1,
+  [PARAM_GEN3_AMP]: .5,
+
   [PARAM_FILTER_CUTOFF]: 0.5,
+
   [PARAM_GEN1_FINE_OFFSET]: 0.5,
   [PARAM_GEN1_COARSE_OFFSET]: 0.5,
   [PARAM_GEN2_FINE_OFFSET]: 0.5,
   [PARAM_GEN2_COARSE_OFFSET]: 0.5,
+  [PARAM_GEN3_FINE_OFFSET]: 0.5,
+  [PARAM_GEN3_COARSE_OFFSET]: 0.75,
 
   [PARAM_AMP_ENV_ATTACK]: 0.05,
   [PARAM_AMP_ENV_DECAY]: 0.1,
@@ -91,12 +104,17 @@ const PARAM_COMMANDS = (() => {
   return {
     ...args(PARAM_GEN1_WAVE_TYPE, indexed(PARAM_WAVE_OPTIONS)),
     ...args(PARAM_GEN2_WAVE_TYPE, indexed(PARAM_WAVE_OPTIONS)),
-    ...args(PARAM_GEN_MIX, linear()),
+    ...args(PARAM_GEN3_WAVE_TYPE, indexed(PARAM_WAVE_OPTIONS)),
+    ...args(PARAM_GEN1_AMP, linear()),
+    ...args(PARAM_GEN2_AMP, linear()),
+    ...args(PARAM_GEN3_AMP, linear()),
     ...args(PARAM_FILTER_CUTOFF, linear()),
     ...args(PARAM_GEN1_FINE_OFFSET, linear()),
     ...args(PARAM_GEN1_COARSE_OFFSET, linear(0, 48)),
     ...args(PARAM_GEN2_FINE_OFFSET, linear()),
     ...args(PARAM_GEN2_COARSE_OFFSET, linear(0, 48)),
+    ...args(PARAM_GEN3_FINE_OFFSET, linear()),
+    ...args(PARAM_GEN3_COARSE_OFFSET, linear(0, 48)),
     ...args(PARAM_AMP_ENV_ATTACK, linear()),
     ...args(PARAM_AMP_ENV_DECAY, linear()),
     ...args(PARAM_AMP_ENV_SUSTAIN, linear()),

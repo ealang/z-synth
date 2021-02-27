@@ -30,7 +30,7 @@ static constexpr uint8_t NRPN_MSB_VALUE = 0x10;
 
 static constexpr uint8_t PARAM_GEN1_WAVE_TYPE     = 0x00;
 static constexpr uint8_t PARAM_GEN2_WAVE_TYPE     = 0x01;
-static constexpr uint8_t PARAM_GEN_MIX            = 0x02;
+static constexpr uint8_t PARAM_GEN1_AMP           = 0x02;
 static constexpr uint8_t PARAM_FILTER_CUTOFF      = 0x03;
 static constexpr uint8_t PARAM_GEN1_FINE_OFFSET   = 0x04;
 static constexpr uint8_t PARAM_GEN2_FINE_OFFSET   = 0x05;
@@ -49,13 +49,20 @@ static constexpr uint8_t PARAM_LFO_WAVE_TYPE      = 0x11;
 static constexpr uint8_t PARAM_MASTER_AMP         = 0x12;
 static constexpr uint8_t PARAM_GEN1_COARSE_OFFSET = 0x13;
 static constexpr uint8_t PARAM_GEN2_COARSE_OFFSET = 0x14;
+static constexpr uint8_t PARAM_GEN3_FINE_OFFSET   = 0x15;
+static constexpr uint8_t PARAM_GEN3_COARSE_OFFSET = 0x16;
+static constexpr uint8_t PARAM_GEN3_WAVE_TYPE     = 0x17;
+static constexpr uint8_t PARAM_GEN2_AMP           = 0x18;
+static constexpr uint8_t PARAM_GEN3_AMP           = 0x19;
 
 static const std::vector<std::function<float(float)>> generatorTable {
   square_function,
   sine_function,
   triangle_function,
   noise_function,
-  saw_function
+  saw_function,
+  sampled_noise(8),
+  reverse_saw_function
 };
 
 class NullBuffer : public std::streambuf
@@ -70,10 +77,10 @@ class PerVoiceController {
   std::shared_ptr<GeneratorElement> lfoElement;
   std::shared_ptr<GeneratorElement> genElement1;
   std::shared_ptr<GeneratorElement> genElement2;
+  std::shared_ptr<GeneratorElement> genElement3;
   std::shared_ptr<MixerElement> mixerElement;
   std::shared_ptr<ADSRElement> adsrAmpElement;
   std::shared_ptr<ADSRElement> adsrFilterElement;
-  std::shared_ptr<DistortionElement> distElement;
   std::shared_ptr<LowpassFilterElement> filterElement;
 
   // logical element/wiring
@@ -86,8 +93,9 @@ class PerVoiceController {
 
     genElement1 = std::make_shared<GeneratorElement>(params.sampleRateHz, saw_function);
     genElement2 = std::make_shared<GeneratorElement>(params.sampleRateHz, sine_function);
+    genElement3 = std::make_shared<GeneratorElement>(params.sampleRateHz, sine_function);
 
-    uint32_t numElements = 2;
+    uint32_t numElements = 3;
     mixerElement = std::make_shared<MixerElement>(numElements);
 
     adsrAmpElement = std::make_shared<ADSRElement>(params.sampleRateHz);
@@ -101,8 +109,6 @@ class PerVoiceController {
     adsrFilterElement->setDecayTime(0.1);
     adsrFilterElement->setSustainLevel(0.5);
     adsrFilterElement->setReleaseTime(0.3);
-
-    distElement = std::make_shared<DistortionElement>(2, 1, 5);
 
     filterElement = std::make_shared<LowpassFilterElement>(params.sampleRateHz, 620, 101);
   }
@@ -124,6 +130,11 @@ class PerVoiceController {
     snprintf(gen2Name, sizeof(gen2Name), "gen2-%d", i);
     builder.registerElem(gen2Name, genElement2);
 
+    // generator3
+    char gen3Name[20];
+    snprintf(gen3Name, sizeof(gen3Name), "gen3-%d", i);
+    builder.registerElem(gen3Name, genElement3);
+
     // mixer
     char mixerName[20];
     snprintf(mixerName, sizeof(mixerName), "mixer-%d", i);
@@ -138,11 +149,6 @@ class PerVoiceController {
     snprintf(adsrFilterName, sizeof(adsrFilterName), "adsr-filt-%d", i);
     builder.registerElem(adsrFilterName, adsrFilterElement);
 
-    // distortion effect
-    char distName[20];
-    snprintf(distName, sizeof(distName), "dist-%d", i);
-    builder.registerElem(distName, distElement);
-
     // filter
     char filterName[20];
     snprintf(filterName, sizeof(filterName), "filter-%d", i);
@@ -151,18 +157,19 @@ class PerVoiceController {
     // generator mods
     builder.connectElems(lfoName, gen1Name, genElement1->fmPortNumber());
     builder.connectElems(lfoName, gen2Name, genElement2->fmPortNumber());
+    builder.connectElems(lfoName, gen3Name, genElement3->fmPortNumber());
 
     // filter mods
     builder.connectElems(adsrFilterName, filterName, filterElement->modPortNumber());
 
-    // gen1, gen1 -> mixer -> adsr amp -> filter -> dist
+    // gens -> mixer -> adsr amp -> filter
     builder.connectElems(gen1Name, mixerName, mixerElement->inputPortNumber(0));
     builder.connectElems(gen2Name, mixerName, mixerElement->inputPortNumber(1));
+    builder.connectElems(gen3Name, mixerName, mixerElement->inputPortNumber(2));
     builder.connectElems(mixerName, adsrAmpName, adsrAmpElement->inputPortNumber());
     builder.connectElems(adsrAmpName, filterName, filterElement->inputPortNumber());
-    builder.connectElems(filterName, distName, distElement->inputPortNumber());
 
-    builder.setOutputElem(distName);
+    builder.setOutputElem(filterName);
 
     _pipeline = builder.build(params.bufferSampleCount);
   }
@@ -172,8 +179,10 @@ public:
   float fmSemitoneRange = 1;
   int gen1SemitoneOffset = 0;
   int gen2SemitoneOffset = 0;
+  int gen3SemitoneOffset = 0;
   float gen1FineOffset = 0;
   float gen2FineOffset = 0;
+  float gen3FineOffset = 0;
 
   PerVoiceController(AudioParams params, uint32_t i) {
     constructElems(params);
@@ -187,15 +196,20 @@ public:
   void onNoteOnEvent(unsigned char note, unsigned char) {
     float gen1Offset = gen1SemitoneOffset + gen1FineOffset;
     float gen2Offset = gen2SemitoneOffset + gen2FineOffset;
+    float gen3Offset = gen3SemitoneOffset + gen3FineOffset;
 
     float frequency1 = midiNoteToFreq(note + gen1Offset);
     float frequency2 = midiNoteToFreq(note + gen2Offset);
+    float frequency3 = midiNoteToFreq(note + gen3Offset);
     float frequencyModRange1 = (midiNoteToFreq(note + gen1Offset + 1) - frequency1) * fmSemitoneRange;
     float frequencyModRange2 = (midiNoteToFreq(note + gen2Offset + 1) - frequency2) * fmSemitoneRange;
+    float frequencyModRange3 = (midiNoteToFreq(note + gen3Offset + 1) - frequency3) * fmSemitoneRange;
     genElement1->setFrequency(frequency1);
     genElement2->setFrequency(frequency2);
+    genElement3->setFrequency(frequency3);
     genElement1->setFMLinearRange(frequencyModRange1);
     genElement2->setFMLinearRange(frequencyModRange2);
+    genElement3->setFMLinearRange(frequencyModRange3);
 
     adsrAmpElement->trigger();
     adsrFilterElement->trigger();
@@ -245,12 +259,24 @@ public:
         logger << "Set gen 2 wave " << static_cast<int>(paramValue) << std::endl;
         genElement2->setValue(generatorTable[paramValue]);
       }
-    } else if (paramNumber == PARAM_GEN_MIX) {
-      // Generator 1-2 mix
+    } else if (paramNumber == PARAM_GEN3_WAVE_TYPE) {
+      // Generator 2 wave type
+      if (paramValue < generatorTable.size()) {
+        logger << "Set gen 3 wave " << static_cast<int>(paramValue) << std::endl;
+        genElement3->setValue(generatorTable[paramValue]);
+      }
+    } else if (paramNumber == PARAM_GEN1_AMP) {
       const float mix = normMidi(paramValue);
-      logger << "Set mix to " << mix << std::endl;
-      mixerElement->setWeight(0, 1 - mix);
+      logger << "Set gen 1 amp to " << mix << std::endl;
+      mixerElement->setWeight(0, mix);
+    } else if (paramNumber == PARAM_GEN2_AMP) {
+      const float mix = normMidi(paramValue);
+      logger << "Set gen 2 amp to " << mix << std::endl;
       mixerElement->setWeight(1, mix);
+    } else if (paramNumber == PARAM_GEN3_AMP) {
+      const float mix = normMidi(paramValue);
+      logger << "Set gen 3 amp to " << mix << std::endl;
+      mixerElement->setWeight(2, mix);
     } else if (paramNumber == PARAM_FILTER_CUTOFF) {
       auto scale = powerScaleClamped(3, 0, 127, filterMinCutoffHz, filterMaxCutoffHz);
       float cutoffFreq = scale(paramValue);
@@ -268,6 +294,12 @@ public:
     } else if (paramNumber == PARAM_GEN2_COARSE_OFFSET) {
       gen2SemitoneOffset = static_cast<int>(clamp(paramValue, 0, 48)) - 24;
       logger << "Set gen 2 semitone offset to " << gen2SemitoneOffset << std::endl;
+    } else if (paramNumber == PARAM_GEN3_FINE_OFFSET) {
+      gen3FineOffset = normMidiEven(paramValue, -1, 1);
+      logger << "Set gen 3 fine offset to " << gen3FineOffset << std::endl;
+    } else if (paramNumber == PARAM_GEN3_COARSE_OFFSET) {
+      gen3SemitoneOffset = static_cast<int>(clamp(paramValue, 0, 48)) - 24;
+      logger << "Set gen 3 semitone offset to " << gen3SemitoneOffset << std::endl;
     } else if (paramNumber == PARAM_AMP_ENV_ATTACK) {
       float attack = normMidi(paramValue, envelopeMinAttack, envelopeMaxAttack);
       logger << "Set amp attack time to " << attack << std::endl;
@@ -300,10 +332,6 @@ public:
       float release = normMidi(paramValue, envelopeMinRelease, envelopeMaxRelease);
       logger << "Set filter release time to " << release << std::endl;
       adsrFilterElement->setReleaseTime(release);
-    } else if (paramNumber == PARAM_DISTORTION) {
-      float value = normMidi(paramValue) * maxDistortionParam;
-      logger << "Set distortion param to " << value << std::endl;
-      distElement->setDefaultAmount(value);
     } else if (paramNumber == PARAM_LFO_AMP) {
       float value = normMidi(paramValue) * maxLFOAmp;
       logger << "Set LFO amp to " << value << std::endl;
@@ -327,7 +355,9 @@ ZSynthController::ZSynthController(AudioParams params, uint32_t polyphony, uint3
     polyphonyPartitioning(polyphony)
 {
 
+  // Construct elements
   std::vector<std::shared_ptr<AudioElement<float>>> elements;
+
   for (uint32_t i = 0; i < polyphony; ++i) {
     auto voiceController = std::make_shared<PerVoiceController>(params, i);
     voiceControllers.emplace_back(voiceController);
@@ -340,10 +370,22 @@ ZSynthController::ZSynthController(AudioParams params, uint32_t polyphony, uint3
     elements,
     maxMasterAmp * 0.5f
   );
+
+  distElement = std::make_shared<DistortionElement>();
+
+  // Wiring
+  PipelineBuilder<float> builder;
+
+  builder.registerElem("voices", mixerElement);
+  builder.registerElem("dist", distElement);
+  builder.connectElems("voices", "dist", distElement->inputPortNumber());
+  builder.setOutputElem("dist");
+
+  _pipeline = builder.build(params.bufferSampleCount);
 }
 
 std::shared_ptr<AudioElement<float>> ZSynthController::pipeline() const {
-  return mixerElement;
+  return _pipeline;
 }
 
 void ZSynthController::injectMidi(Rx::observable<const snd_seq_event_t*> midi) {
@@ -385,6 +427,10 @@ void ZSynthController::onNRPNValueHighChange(
       float value = paramValue / 127. * maxMasterAmp;
       std::cout << "Set master amp " << value << std::endl;
       mixerElement->setAmp(value);
+    } else if (paramLow == PARAM_DISTORTION) {
+      float value = paramValue / 127. * maxDistortionParam;
+      std::cout << "Set distortion param to " << value << std::endl;
+      distElement->setDefaultAmount(value);
     } else {
       int i = 0;
       for (auto &voice: voiceControllers) {

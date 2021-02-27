@@ -20,21 +20,30 @@ function ParamControls({params, onParamChanged}) {
   };
 
   return (
-    <div>
+    <React.Fragment>
       <div className="flex-container-row">
         <ControlGroup label="Gen 1">
-          <SelectWithLabel label="Wave 1" {...selectArgs(PARAM_GEN1_WAVE_TYPE, PARAM_WAVE_OPTIONS)} />
-          <KnobWithLabel label="Offset 1" {...knobArgs(PARAM_GEN1_COARSE_OFFSET)} />
-          <KnobWithLabel label="Tune 1" {...knobArgs(PARAM_GEN1_FINE_OFFSET)} />
+          <SelectWithLabel label="Wave" {...selectArgs(PARAM_GEN1_WAVE_TYPE, PARAM_WAVE_OPTIONS)} />
+          <KnobWithLabel label="Offset" {...knobArgs(PARAM_GEN1_COARSE_OFFSET)} />
+          <KnobWithLabel label="Tune" {...knobArgs(PARAM_GEN1_FINE_OFFSET)} />
+          <KnobWithLabel label="Amp" {...knobArgs(PARAM_GEN1_AMP)} />
         </ControlGroup>
         <ControlGroup label="Gen 2">
-          <SelectWithLabel label="Wave 2" {...selectArgs(PARAM_GEN2_WAVE_TYPE, PARAM_WAVE_OPTIONS)} />
-          <KnobWithLabel label="Offset 2" {...knobArgs(PARAM_GEN2_COARSE_OFFSET)} />
-          <KnobWithLabel label="Tune 2" {...knobArgs(PARAM_GEN2_FINE_OFFSET)} />
+          <SelectWithLabel label="Wave" {...selectArgs(PARAM_GEN2_WAVE_TYPE, PARAM_WAVE_OPTIONS)} />
+          <KnobWithLabel label="Offset" {...knobArgs(PARAM_GEN2_COARSE_OFFSET)} />
+          <KnobWithLabel label="Tune" {...knobArgs(PARAM_GEN2_FINE_OFFSET)} />
+          <KnobWithLabel label="Amp" {...knobArgs(PARAM_GEN2_AMP)} />
         </ControlGroup>
-        <ControlGroup label="Generators">
-          <KnobWithLabel label="Mix" {...knobArgs(PARAM_GEN_MIX)} />
-          <KnobWithLabel label="Filter" {...knobArgs(PARAM_FILTER_CUTOFF)} />
+      </div>
+      <div className="flex-container-row">
+        <ControlGroup label="Gen 3">
+          <SelectWithLabel label="Wave" {...selectArgs(PARAM_GEN3_WAVE_TYPE, PARAM_WAVE_OPTIONS)} />
+          <KnobWithLabel label="Offset" {...knobArgs(PARAM_GEN3_COARSE_OFFSET)} />
+          <KnobWithLabel label="Tune" {...knobArgs(PARAM_GEN3_FINE_OFFSET)} />
+          <KnobWithLabel label="Amp" {...knobArgs(PARAM_GEN3_AMP)} />
+        </ControlGroup>
+        <ControlGroup label="Filter">
+          <KnobWithLabel label="Cutoff" {...knobArgs(PARAM_FILTER_CUTOFF)} />
         </ControlGroup>
       </div>
       <div className="flex-container-row">
@@ -52,7 +61,7 @@ function ParamControls({params, onParamChanged}) {
         </ControlGroup>
       </div>
       <div className="flex-container-row">
-        <ControlGroup label="LFO">
+        <ControlGroup label="FM LFO">
           <SelectWithLabel label="Wave" {...selectArgs(PARAM_LFO_WAVE_TYPE, PARAM_WAVE_OPTIONS)} />
           <KnobWithLabel label="Amp" {...knobArgs(PARAM_LFO_AMP)} />
           <KnobWithLabel label="Freq" {...knobArgs(PARAM_LFO_FREQ)} />
@@ -62,6 +71,6 @@ function ParamControls({params, onParamChanged}) {
           <KnobWithLabel label="Amp" {...knobArgs(PARAM_MASTER_AMP)} />
         </ControlGroup>
       </div>
-    </div>
+    </React.Fragment>
   );
 }

@@ -13,6 +13,7 @@
 
 class PerVoiceController;
 class ThreadedMixerElement;
+class DistortionElement;
 
 // Wire up synth modules & midi events
 class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
@@ -22,6 +23,9 @@ class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
 
   std::vector<std::shared_ptr<PerVoiceController>> voiceControllers;
   std::shared_ptr<ThreadedMixerElement> mixerElement;
+  std::shared_ptr<DistortionElement> distElement;
+
+  std::shared_ptr<AudioElement<float>> _pipeline;
 
   void onNoteOnEvent(unsigned char note, unsigned char vel) override;
   void onNoteOffEvent(unsigned char note) override;
