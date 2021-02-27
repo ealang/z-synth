@@ -1,4 +1,4 @@
-function ParamController() {
+function MidiController() {
   const debounceValue = .05;
   const debounceTimeMs = 50;
 

@@ -1,64 +1,10 @@
-function ParamControls({initParams, onParamChanged}) {
-  const wave1Sel = React.useState(initParams[PARAM_GEN1_WAVE_TYPE]);
-  const wave2Sel = React.useState(initParams[PARAM_GEN2_WAVE_TYPE]);
-
-  const mix = React.useState(initParams[PARAM_GEN_MIX]);
-  const cutoff = React.useState(initParams[PARAM_FILTER_CUTOFF]);
-
-  const gen1FineOffset = React.useState(initParams[PARAM_GEN1_FINE_OFFSET]);
-  const gen1CoarseOffset = React.useState(initParams[PARAM_GEN1_COARSE_OFFSET]);
-  const gen2FineOffset = React.useState(initParams[PARAM_GEN2_FINE_OFFSET]);
-  const gen2CoarseOffset = React.useState(initParams[PARAM_GEN2_COARSE_OFFSET]);
-
-  const ampAttack = React.useState(initParams[PARAM_AMP_ENV_ATTACK]);
-  const ampDecay = React.useState(initParams[PARAM_AMP_ENV_DECAY]);
-  const ampSustain = React.useState(initParams[PARAM_AMP_ENV_SUSTAIN]);
-  const ampRelease = React.useState(initParams[PARAM_AMP_ENV_RELEASE]);
-
-  const filterAttack = React.useState(initParams[PARAM_FILTER_ENV_ATTACK]);
-  const filterDecay = React.useState(initParams[PARAM_FILTER_ENV_DECAY]);
-  const filterSustain = React.useState(initParams[PARAM_FILTER_ENV_SUSTAIN]);
-  const filterRelease = React.useState(initParams[PARAM_FILTER_ENV_RELEASE]);
-
-  const distortion = React.useState(initParams[PARAM_DISTORTION]);
-
-  const lfoAmp = React.useState(initParams[PARAM_LFO_AMP]);
-  const lfoFreq = React.useState(initParams[PARAM_LFO_FREQ]);
-  const lfoWaveSel = React.useState(initParams[PARAM_LFO_WAVE_TYPE]);
-
-  const masterAmp = React.useState(initParams[PARAM_MASTER_AMP]);
-
-  const store = {
-    [PARAM_GEN1_WAVE_TYPE]: wave1Sel,
-    [PARAM_GEN2_WAVE_TYPE]: wave2Sel,
-    [PARAM_GEN_MIX]: mix,
-    [PARAM_FILTER_CUTOFF]: cutoff,
-    [PARAM_GEN1_FINE_OFFSET]: gen1FineOffset,
-    [PARAM_GEN1_COARSE_OFFSET]: gen1CoarseOffset,
-    [PARAM_GEN2_FINE_OFFSET]: gen2FineOffset,
-    [PARAM_GEN2_COARSE_OFFSET]: gen2CoarseOffset,
-    [PARAM_AMP_ENV_ATTACK]: ampAttack,
-    [PARAM_AMP_ENV_DECAY]: ampDecay,
-    [PARAM_AMP_ENV_SUSTAIN]: ampSustain,
-    [PARAM_AMP_ENV_RELEASE]: ampRelease,
-    [PARAM_FILTER_ENV_ATTACK]: filterAttack,
-    [PARAM_FILTER_ENV_DECAY]: filterDecay,
-    [PARAM_FILTER_ENV_SUSTAIN]: filterSustain,
-    [PARAM_FILTER_ENV_RELEASE]: filterRelease,
-    [PARAM_DISTORTION]: distortion,
-    [PARAM_LFO_AMP]: lfoAmp,
-    [PARAM_LFO_FREQ]: lfoFreq,
-    [PARAM_LFO_WAVE_TYPE]: lfoWaveSel,
-    [PARAM_MASTER_AMP]: masterAmp,
-  };
-
+function ParamControls({params, onParamChanged}) {
   const selectArgs = (param, values) => {
     return {
-      "value": store[param][0],
+      "value": params[param],
       "values": values,
       "onValueChanged": (event) => {
         const value = event.target.value;
-        store[param][1](value);
         onParamChanged(param, value);
       },
     };
@@ -66,9 +12,8 @@ function ParamControls({initParams, onParamChanged}) {
 
   const knobArgs = (param) => {
     return {
-      "value": store[param][0],
+      "value": params[param],
       "onValueChanged": (value) => {
-        store[param][1](value);
         onParamChanged(param, value);
       },
     };
