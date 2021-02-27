@@ -10,7 +10,7 @@ constexpr float filterDebounceHz = 1;
 static std::vector<float> firFilterWeights(uint32_t sampleRateHz, float cutoffFreq, uint32_t n);
 
 class FilterCache {
-  static constexpr float startHz = 0;
+  static constexpr float startHz = 20;
   static constexpr float endHz = 20000;
   static constexpr float stepHz = 1;
   static uint32_t _sampleRateHz;
