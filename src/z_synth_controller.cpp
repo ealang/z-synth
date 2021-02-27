@@ -11,6 +11,8 @@
 #include "./synth_utils/scale.h"
 #include "./pipeline/pipeline_builder.h"
 
+#include <cmath>
+
 static constexpr float filterMinCutoffHz = 50;
 static constexpr float filterMaxCutoffHz = 20000;
 static constexpr float maxFmSemiToneRange = 3;
@@ -19,11 +21,14 @@ static constexpr float envelopeMaxAttack = 1;
 static constexpr float envelopeMaxDecay = 1;
 static constexpr float envelopeMinRelease = 0.01;
 static constexpr float envelopeMaxRelease = 5;
-static constexpr float maxDistortionParam = 5;
 static constexpr float minLFOFrequencyHz = 0.1;
 static constexpr float maxLFOFrequencyHz = 50;
 static constexpr float maxLFOAmp = 1;
-static constexpr float maxMasterAmp = 0.1;
+static constexpr float maxMasterAmp = 1;
+static constexpr float defaultMasterAmp = maxMasterAmp * 0.5;
+static constexpr float defaultMasterOverdrive = 1;
+static constexpr float overdriveMultiplier = 64;
+static constexpr float maxGeneratorMixerWeight = 3;
 
 static constexpr uint8_t NRPN_MSB_VALUE = 0x10;
 
@@ -95,7 +100,7 @@ class PerVoiceController {
     genElement3 = std::make_shared<GeneratorElement>(params.sampleRateHz, sine_function);
 
     uint32_t numElements = 3;
-    mixerElement = std::make_shared<MixerElement>(numElements);
+    mixerElement = std::make_shared<MixerElement>(numElements, 1);
 
     adsrAmpElement = std::make_shared<ADSRElement>(params.sampleRateHz);
     adsrAmpElement->setAttackTime(0.01);
@@ -267,15 +272,15 @@ public:
     } else if (paramNumber == PARAM_GEN1_AMP) {
       const float mix = normMidi(paramValue);
       logger << "Set gen 1 amp to " << mix << std::endl;
-      mixerElement->setWeight(0, mix);
+      mixerElement->setWeight(0, mix * maxGeneratorMixerWeight);
     } else if (paramNumber == PARAM_GEN2_AMP) {
       const float mix = normMidi(paramValue);
       logger << "Set gen 2 amp to " << mix << std::endl;
-      mixerElement->setWeight(1, mix);
+      mixerElement->setWeight(1, mix * maxGeneratorMixerWeight);
     } else if (paramNumber == PARAM_GEN3_AMP) {
       const float mix = normMidi(paramValue);
       logger << "Set gen 3 amp to " << mix << std::endl;
-      mixerElement->setWeight(2, mix);
+      mixerElement->setWeight(2, mix * maxGeneratorMixerWeight);
     } else if (paramNumber == PARAM_FILTER_CUTOFF) {
       auto scale = powerScaleClamped(3, 0, 127, filterMinCutoffHz, filterMaxCutoffHz);
       float cutoffFreq = scale(paramValue);
@@ -348,10 +353,19 @@ public:
   }
 };
 
+static float computeOverdriveOutputScale(float masterOverdrive) {
+  // This code is attempting to keep output levels consistent when applying
+  // distortion. TODO: Find a more consistent way of handling this.
+  constexpr float scale = 0.1;
+  return tanh(defaultMasterOverdrive * scale) / tanh(masterOverdrive * scale);
+}
+
 ZSynthController::ZSynthController(AudioParams params, uint32_t polyphony, uint32_t numThreads)
   : params(params),
     polyphony(polyphony),
-    polyphonyPartitioning(polyphony)
+    polyphonyPartitioning(polyphony),
+    masterAmp(defaultMasterAmp),
+    masterOverdrive(defaultMasterOverdrive)
 {
 
   // Construct elements
@@ -367,10 +381,12 @@ ZSynthController::ZSynthController(AudioParams params, uint32_t polyphony, uint3
     params.bufferSampleCount,
     numThreads,
     elements,
-    maxMasterAmp * 0.5f
+    1.0 / elements.size()
   );
 
-  ampElement = std::make_shared<AmpElement>(1);
+  ampElement = std::make_shared<AmpElement>();
+  ampElement->setInputAmplificationValue(defaultMasterOverdrive);
+  ampElement->setMaxOutputValue(defaultMasterAmp * computeOverdriveOutputScale(defaultMasterOverdrive));
 
   // Wiring
   PipelineBuilder<float> builder;
@@ -423,13 +439,15 @@ void ZSynthController::onNRPNValueHighChange(
 ) {
   if (paramHigh == NRPN_MSB_VALUE) {
     if (paramLow == PARAM_MASTER_AMP) {
-      float value = paramValue / 127. * maxMasterAmp;
-      std::cout << "Set master amp " << value << std::endl;
-      mixerElement->setAmp(value);
+      masterAmp = paramValue / 127. * maxMasterAmp;
+      std::cout << "Set master amp " << masterAmp << std::endl;
+      ampElement->setMaxOutputValue(masterAmp * computeOverdriveOutputScale(masterOverdrive));
+
     } else if (paramLow == PARAM_DISTORTION) {
-      float value = paramValue / 127. * maxDistortionParam;
-      std::cout << "Set distortion param to " << value << std::endl;
-      // ampElement->setDefaultAmount(value);
+      masterOverdrive = 1 + paramValue / 127. * overdriveMultiplier;
+      std::cout << "Set master overdrive param to " << masterOverdrive << std::endl;
+      ampElement->setInputAmplificationValue(masterOverdrive);
+      ampElement->setMaxOutputValue(masterAmp * computeOverdriveOutputScale(masterOverdrive));
     } else {
       int i = 0;
       for (auto &voice: voiceControllers) {

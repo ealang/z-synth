@@ -9,10 +9,20 @@ int midiLoop(snd_seq_t *const midiDevice, function<void(const snd_seq_event_t*)>
   }
 }
 
+static inline float clamp(float value) {
+  if (value <= -1) {
+    return -1;
+  }
+  if (value >= 1) {
+    return 1;
+  }
+  return value;
+}
+
 static void encodeToBufferFmt(sample_t* to, uint32_t count, const float* from, uint32_t numChannels) {
   static const int maxval = (1 << 15) - 1;
   for (uint32_t i = 0; i < count; ++i) {
-    sample_t val = *(from++) * maxval;
+    sample_t val = *(from++) * clamp(maxval) * maxval;
     for (uint32_t c = 0; c < numChannels; ++c) {
       *(to++) = val;
     }

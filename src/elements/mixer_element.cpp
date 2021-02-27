@@ -6,6 +6,9 @@
 MixerElement::MixerElement(uint32_t n)
   : _weights(n, 1. / n) {}
 
+MixerElement::MixerElement(uint32_t n, float weight)
+  : _weights(n, weight) {}
+
 MixerElement::MixerElement(std::vector<float> weights)
   : _weights(weights) {}
 

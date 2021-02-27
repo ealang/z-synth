@@ -20,6 +20,8 @@ class ZSynthController : public MidiNoteListener, public MidiNRPNListener {
   const AudioParams params;
   const uint32_t polyphony;
   PolyphonyPartitioning polyphonyPartitioning;
+  float masterAmp;
+  float masterOverdrive;
 
   std::vector<std::shared_ptr<PerVoiceController>> voiceControllers;
   std::shared_ptr<ThreadedMixerElement> mixerElement;

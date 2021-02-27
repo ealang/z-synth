@@ -13,6 +13,7 @@ class MixerElement: public AudioElement<float> {
   std::vector<float> _weights;
 public:
   MixerElement(uint32_t n);
+  MixerElement(uint32_t n, float weight);
   MixerElement(std::vector<float> weights);
 
   uint32_t maxInputs() const override;

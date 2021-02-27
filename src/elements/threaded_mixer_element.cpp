@@ -73,13 +73,13 @@ ThreadedMixerElement::ThreadedMixerElement(
 ): _outputBuffers(elements.size() * bufferSampleCount, 0),
    _elements(elements),
    _state(std::make_shared<SharedState>()),
-   _ampInputs(elements.size(), 0),
-   _amp(amp)
+   _mixerInputs(elements.size(), 0),
+   _mixer(elements.size(), amp)
 {
 
   for (uint32_t i = 0; i < elements.size(); ++i) {
     float *outputBuffer = &_outputBuffers.data()[i * bufferSampleCount];
-    _ampInputs[i] = outputBuffer;
+    _mixerInputs[i] = outputBuffer;
 
     auto element = elements[i];
     _state->work.emplace_back([element, bufferSampleCount, outputBuffer]() {
@@ -104,10 +104,6 @@ uint32_t ThreadedMixerElement::maxInputs() const {
   return 0;
 }
 
-void ThreadedMixerElement::setAmp(float amp) {
-  _amp.setAmp(amp);
-}
-
 void ThreadedMixerElement::generate(uint32_t numSamples, float* out, uint32_t, inputs_t<float>) {
   const uint32_t numElements = _elements.size();
 
@@ -126,5 +122,5 @@ void ThreadedMixerElement::generate(uint32_t numSamples, float* out, uint32_t, i
     });
   }
 
-  _amp.generate(numSamples, out, numElements, _ampInputs.data());
+  _mixer.generate(numSamples, out, numElements, _mixerInputs.data());
 };

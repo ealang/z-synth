@@ -2,7 +2,7 @@
 #define THREADED_MIXER_ELEMENT_H
 
 #include "../pipeline/pipeline_element.h"
-#include "./amp_element.h"
+#include "./mixer_element.h"
 
 #include <cstdint>
 #include <memory>
@@ -20,8 +20,8 @@ class ThreadedMixerElement: public AudioElement<float> {
 
   std::shared_ptr<SharedState> _state;
 
-  std::vector<float*> _ampInputs;
-  AmpElement _amp;
+  std::vector<float*> _mixerInputs;
+  MixerElement _mixer;
 
 public:
   ThreadedMixerElement(
@@ -33,8 +33,6 @@ public:
   ~ThreadedMixerElement();
 
   uint32_t maxInputs() const override;
-
-  void setAmp(float amp);
 
   void generate(uint32_t numSamples, float* out, uint32_t numInputs, inputs_t<float> inputs) override;
 };
