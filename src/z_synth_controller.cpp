@@ -2,7 +2,6 @@
 
 #include "./elements/adsr_element.h"
 #include "./elements/amp_element.h"
-#include "./elements/distortion_element.h"
 #include "./elements/generator_element.h"
 #include "./elements/lowpass_filter_element.h"
 #include "./elements/mixer_element.h"
@@ -371,15 +370,15 @@ ZSynthController::ZSynthController(AudioParams params, uint32_t polyphony, uint3
     maxMasterAmp * 0.5f
   );
 
-  distElement = std::make_shared<DistortionElement>();
+  ampElement = std::make_shared<AmpElement>(1);
 
   // Wiring
   PipelineBuilder<float> builder;
 
   builder.registerElem("voices", mixerElement);
-  builder.registerElem("dist", distElement);
-  builder.connectElems("voices", "dist", distElement->inputPortNumber());
-  builder.setOutputElem("dist");
+  builder.registerElem("amp", ampElement);
+  builder.connectElems("voices", "amp", ampElement->inputPortNumber(0));
+  builder.setOutputElem("amp");
 
   _pipeline = builder.build(params.bufferSampleCount);
 }
@@ -430,7 +429,7 @@ void ZSynthController::onNRPNValueHighChange(
     } else if (paramLow == PARAM_DISTORTION) {
       float value = paramValue / 127. * maxDistortionParam;
       std::cout << "Set distortion param to " << value << std::endl;
-      distElement->setDefaultAmount(value);
+      // ampElement->setDefaultAmount(value);
     } else {
       int i = 0;
       for (auto &voice: voiceControllers) {

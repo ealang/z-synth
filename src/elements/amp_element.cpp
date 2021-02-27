@@ -1,6 +1,13 @@
 #include "./amp_element.h"
 
 #include <cstring>
+#include <cmath>
+
+static constexpr float tanhDomainScale = 4;
+
+static inline float valueAt(float x, float amount) {
+  return tanh(x * (1 + amount * tanhDomainScale));
+}
 
 AmpElement::AmpElement(float amp):
   _amp(amp) {
@@ -28,5 +35,11 @@ void AmpElement::generate(uint32_t numSamples, float* out, uint32_t numInputs, i
         *(outBuffer++) += *(inBuffer++) * _amp;
       }
     }
+  }
+
+  float *outBuffer = out;
+  for (uint32_t i = 0; i < numSamples; ++i) {
+    *outBuffer = valueAt(*outBuffer, 1);
+    ++outBuffer;
   }
 };
