@@ -61,10 +61,12 @@ function ParamControls({params, onParamChanged}) {
         </ControlGroup>
       </div>
       <div className="flex-container-row">
-        <ControlGroup label="FM LFO">
+        <ControlGroup label="LFO + Mods">
           <SelectWithLabel label="Wave" {...selectArgs(PARAM_LFO_WAVE_TYPE, PARAM_WAVE_OPTIONS)} />
-          <KnobWithLabel label="Amp" {...knobArgs(PARAM_LFO_AMP)} />
           <KnobWithLabel label="Freq" {...knobArgs(PARAM_LFO_FREQ)} />
+          <KnobWithLabel label="FM" {...knobArgs(PARAM_LFO_MOD_FREQ_AMT)} />
+          <KnobWithLabel label="AM" {...knobArgs(PARAM_LFO_MOD_AMP_AMT)} />
+          <KnobWithLabel label="Cutoff" {...knobArgs(PARAM_LFO_MOD_FILT_AMT)} />
         </ControlGroup>
         <ControlGroup label="Master">
           <KnobWithLabel label="Dist" {...knobArgs(PARAM_DISTORTION)} />

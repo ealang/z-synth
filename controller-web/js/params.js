@@ -15,7 +15,6 @@ const PARAM_FILTER_ENV_DECAY   = 0x0B;
 const PARAM_FILTER_ENV_SUSTAIN = 0x0C;
 const PARAM_FILTER_ENV_RELEASE = 0x0D;
 const PARAM_DISTORTION         = 0x0E;
-const PARAM_LFO_AMP            = 0x0F;
 const PARAM_LFO_FREQ           = 0x10;
 const PARAM_LFO_WAVE_TYPE      = 0x11;
 const PARAM_MASTER_AMP         = 0x12;
@@ -26,6 +25,9 @@ const PARAM_GEN3_COARSE_OFFSET = 0x16;
 const PARAM_GEN3_WAVE_TYPE     = 0x17;
 const PARAM_GEN2_AMP           = 0x18;
 const PARAM_GEN3_AMP           = 0x19;
+const PARAM_LFO_MOD_FREQ_AMT   = 0x1A;
+const PARAM_LFO_MOD_FILT_AMT   = 0x1B;
+const PARAM_LFO_MOD_AMP_AMT    = 0x1C;
 
 const PARAM_WAVE_OPTIONS = ["square", "sine", "triangle", "noise", "saw", "noise samp 8", "reverse saw"];
 
@@ -58,10 +60,13 @@ const DEFAULT_PARAM_VALUES = {
   [PARAM_FILTER_ENV_RELEASE]: 0.1,
 
   [PARAM_DISTORTION]: 0,
-  [PARAM_LFO_AMP]: 0.1,
   [PARAM_LFO_FREQ]: 0.05,
   [PARAM_LFO_WAVE_TYPE]: PARAM_WAVE_OPTIONS[1],
   [PARAM_MASTER_AMP]: 0.5,
+
+  [PARAM_LFO_MOD_FREQ_AMT]: 0.1,
+  [PARAM_LFO_MOD_FILT_AMT]: 0,
+  [PARAM_LFO_MOD_AMP_AMT]: 0,
 };
 
 const PARAM_COMMANDS = (() => {
@@ -124,9 +129,11 @@ const PARAM_COMMANDS = (() => {
     ...args(PARAM_FILTER_ENV_SUSTAIN, linear()),
     ...args(PARAM_FILTER_ENV_RELEASE, linear()),
     ...args(PARAM_DISTORTION, linear()),
-    ...args(PARAM_LFO_AMP, linear()),
     ...args(PARAM_LFO_FREQ, linear()),
     ...args(PARAM_LFO_WAVE_TYPE, indexed(PARAM_WAVE_OPTIONS)),
+    ...args(PARAM_LFO_MOD_FREQ_AMT, linear()),
+    ...args(PARAM_LFO_MOD_FILT_AMT, linear()),
+    ...args(PARAM_LFO_MOD_AMP_AMT, linear()),
     ...args(PARAM_MASTER_AMP, linear()),
   };
 })();

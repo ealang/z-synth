@@ -4,6 +4,7 @@
 #include "./elements/amp_element.h"
 #include "./elements/generator_element.h"
 #include "./elements/lowpass_filter_element.h"
+#include "./elements/math_mult_add_element.h"
 #include "./elements/mixer_element.h"
 #include "./elements/threaded_mixer_element.h"
 #include "./synth_utils/generator_functions.h"
@@ -13,6 +14,8 @@
 
 #include <cmath>
 
+// Defaults and ranges
+
 static constexpr float filterMinCutoffHz = 50;
 static constexpr float filterMaxCutoffHz = 20000;
 static constexpr float maxFmSemiToneRange = 3;
@@ -21,14 +24,21 @@ static constexpr float envelopeMaxAttack = 1;
 static constexpr float envelopeMaxDecay = 1;
 static constexpr float envelopeMinRelease = 0.01;
 static constexpr float envelopeMaxRelease = 5;
-static constexpr float minLFOFrequencyHz = 0.1;
-static constexpr float maxLFOFrequencyHz = 50;
-static constexpr float maxLFOAmp = 1;
+
+static constexpr float minLfoFrequencyHz = 0.1;
+static constexpr float maxLfoFrequencyHz = 50;
+static constexpr float defaultLfoFreqHz = 8;
+static constexpr float defaultLfoSendGenFM = 0.1;
+static constexpr float defaultLfoSendGenAm = 0;
+static constexpr float defaultLfoSendFilterCutoff = 0;
+
 static constexpr float maxMasterAmp = 1;
 static constexpr float defaultMasterAmp = maxMasterAmp * 0.5;
 static constexpr float defaultMasterOverdrive = 1;
 static constexpr float overdriveMultiplier = 64;
 static constexpr float maxGeneratorMixerWeight = 3;
+
+// Param numbers
 
 static constexpr uint8_t NRPN_MSB_VALUE = 0x10;
 
@@ -47,7 +57,6 @@ static constexpr uint8_t PARAM_FILTER_ENV_DECAY   = 0x0B;
 static constexpr uint8_t PARAM_FILTER_ENV_SUSTAIN = 0x0C;
 static constexpr uint8_t PARAM_FILTER_ENV_RELEASE = 0x0D;
 static constexpr uint8_t PARAM_DISTORTION         = 0x0E;
-static constexpr uint8_t PARAM_LFO_AMP            = 0x0F;
 static constexpr uint8_t PARAM_LFO_FREQ           = 0x10;
 static constexpr uint8_t PARAM_LFO_WAVE_TYPE      = 0x11;
 static constexpr uint8_t PARAM_MASTER_AMP         = 0x12;
@@ -58,6 +67,9 @@ static constexpr uint8_t PARAM_GEN3_COARSE_OFFSET = 0x16;
 static constexpr uint8_t PARAM_GEN3_WAVE_TYPE     = 0x17;
 static constexpr uint8_t PARAM_GEN2_AMP           = 0x18;
 static constexpr uint8_t PARAM_GEN3_AMP           = 0x19;
+static constexpr uint8_t PARAM_LFO_MOD_FREQ_AMT   = 0x1A;
+static constexpr uint8_t PARAM_LFO_MOD_FILT_AMT   = 0x1B;
+static constexpr uint8_t PARAM_LFO_MOD_AMP_AMT    = 0x1C;
 
 static const std::vector<std::function<float(float)>> generatorTable {
   square_function,
@@ -79,6 +91,9 @@ public:
 class PerVoiceController {
   // Component elements
   std::shared_ptr<GeneratorElement> lfoElement;
+  std::shared_ptr<MathMultAddElement> lfoSendGenFMElement;
+  std::shared_ptr<MathMultAddElement> lfoSendGenAmElement;
+  std::shared_ptr<MathMultAddElement> lfoSendFilterCutoffElement;
   std::shared_ptr<GeneratorElement> genElement1;
   std::shared_ptr<GeneratorElement> genElement2;
   std::shared_ptr<GeneratorElement> genElement3;
@@ -94,8 +109,12 @@ class PerVoiceController {
 
   void constructElems(AudioParams params) {
     lfoElement = std::make_shared<GeneratorElement>(params.sampleRateHz, sine_function);
-    lfoElement->setFrequency(8);
-    lfoElement->setAmplitude(0.05);
+    lfoElement->setFrequency(defaultLfoFreqHz);
+    lfoElement->setAmplitude(1);
+
+    lfoSendGenFMElement = std::make_shared<MathMultAddElement>(defaultLfoSendGenFM, 0);
+    lfoSendGenAmElement = std::make_shared<MathMultAddElement>(defaultLfoSendGenAm, 1);
+    lfoSendFilterCutoffElement = std::make_shared<MathMultAddElement>(defaultLfoSendFilterCutoff, 1);
 
     genElement1 = std::make_shared<GeneratorElement>(params.sampleRateHz, saw_function);
     genElement2 = std::make_shared<GeneratorElement>(params.sampleRateHz, sine_function);
@@ -122,9 +141,23 @@ class PerVoiceController {
   void constructWiring(AudioParams params, uint32_t i) {
     PipelineBuilder<float> builder;
 
+    // lfo
     char lfoName[20];
     snprintf(lfoName, sizeof(lfoName), "lfo-%d", i);
     builder.registerElem(lfoName, lfoElement);
+
+    // lfo mod levels
+    char lfoSendGenFMName[20];
+    snprintf(lfoSendGenFMName, sizeof(lfoSendGenFMName), "lfo-send-fm-%d", i);
+    builder.registerElem(lfoSendGenFMName, lfoSendGenFMElement);
+
+    char lfoSendGenAmName[20];
+    snprintf(lfoSendGenAmName, sizeof(lfoSendGenAmName), "lfo-send-am-%d", i);
+    builder.registerElem(lfoSendGenAmName, lfoSendGenAmElement);
+
+    char lfoSendFilterCutoffName[20];
+    snprintf(lfoSendFilterCutoffName, sizeof(lfoSendFilterCutoffName), "lfo-send-filt-%d", i);
+    builder.registerElem(lfoSendFilterCutoffName, lfoSendFilterCutoffElement);
 
     // generator1
     char gen1Name[20];
@@ -160,12 +193,21 @@ class PerVoiceController {
     snprintf(filterName, sizeof(filterName), "filter-%d", i);
     builder.registerElem(filterName, filterElement);
 
+    // lfo to sends
+    builder.connectElems(lfoName, lfoSendGenFMName, lfoSendGenFMElement->inputPortNumber());
+    builder.connectElems(lfoName, lfoSendGenAmName, lfoSendGenAmElement->inputPortNumber());
+    builder.connectElems(lfoName, lfoSendFilterCutoffName, lfoSendFilterCutoffElement->inputPortNumber());
+
     // generator mods
-    builder.connectElems(lfoName, gen1Name, genElement1->fmPortNumber());
-    builder.connectElems(lfoName, gen2Name, genElement2->fmPortNumber());
-    builder.connectElems(lfoName, gen3Name, genElement3->fmPortNumber());
+    builder.connectElems(lfoSendGenFMName, gen1Name, genElement1->fmPortNumber());
+    builder.connectElems(lfoSendGenFMName, gen2Name, genElement2->fmPortNumber());
+    builder.connectElems(lfoSendGenFMName, gen3Name, genElement3->fmPortNumber());
+    builder.connectElems(lfoSendGenAmName, gen1Name, genElement1->amPortNumber());
+    builder.connectElems(lfoSendGenAmName, gen2Name, genElement2->amPortNumber());
+    builder.connectElems(lfoSendGenAmName, gen3Name, genElement3->amPortNumber());
 
     // filter mods
+    builder.connectElems(lfoSendFilterCutoffName, adsrFilterName, adsrFilterElement->inputPortNumber());
     builder.connectElems(adsrFilterName, filterName, filterElement->modPortNumber());
 
     // gens -> mixer -> adsr amp -> filter
@@ -235,6 +277,7 @@ public:
     unsigned char paramValue,
     bool print
   ) {
+
     const auto normMidi = [](float val, float start = 0, float end = 1) {
       return linearScaleClamped(0, 127, start, end)(val);
     };
@@ -348,12 +391,8 @@ public:
       float release = normMidi(paramValue, envelopeMinRelease, envelopeMaxRelease);
       logger << "Set filter release time to " << release << std::endl;
       adsrFilterElement->setReleaseTime(release);
-    } else if (paramNumber == PARAM_LFO_AMP) {
-      float value = normMidi(paramValue) * maxLFOAmp;
-      logger << "Set LFO amp to " << value << std::endl;
-      lfoElement->setAmplitude(value);
     } else if (paramNumber == PARAM_LFO_FREQ) {
-      float value = normMidi(paramValue, minLFOFrequencyHz, maxLFOFrequencyHz);
+      float value = normMidi(paramValue, minLfoFrequencyHz, maxLfoFrequencyHz);
       logger << "Set LFO frequency to " << value << std::endl;
       lfoElement->setFrequency(value);
     } else if (paramNumber == PARAM_LFO_WAVE_TYPE) {
@@ -361,6 +400,18 @@ public:
         logger << "Set LFO wave " << static_cast<int>(paramValue) << std::endl;
         lfoElement->setValue(generatorTable[paramValue]);
       }
+    } else if (paramNumber == PARAM_LFO_MOD_FREQ_AMT) {
+      float value = normMidi(paramValue);
+      logger << "Set LFO mod gen freq amount " << value << std::endl;
+      lfoSendGenFMElement->setMultValue(value);
+    } else if (paramNumber == PARAM_LFO_MOD_FILT_AMT) {
+      float value = normMidi(paramValue);
+      logger << "Set LFO mod filter cutoff amount " << value << std::endl;
+      lfoSendFilterCutoffElement->setMultValue(value);
+    } else if (paramNumber == PARAM_LFO_MOD_AMP_AMT) {
+      float value = normMidi(paramValue);
+      logger << "Set LFO mod gen amp amount " << value << std::endl;
+      lfoSendGenAmElement->setMultValue(value);
     }
   }
 };
