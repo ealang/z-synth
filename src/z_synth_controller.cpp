@@ -87,6 +87,8 @@ class PerVoiceController {
   std::shared_ptr<ADSRElement> adsrFilterElement;
   std::shared_ptr<LowpassFilterElement> filterElement;
 
+  unsigned char lastNote = 0;
+
   // logical element/wiring
   std::shared_ptr<AudioElement<float>> _pipeline;
 
@@ -178,6 +180,25 @@ class PerVoiceController {
     _pipeline = builder.build(params.bufferSampleCount);
   }
 
+  void updateGeneratorFrequencyParams() {
+    float gen1Offset = gen1SemitoneOffset + gen1FineOffset;
+    float gen2Offset = gen2SemitoneOffset + gen2FineOffset;
+    float gen3Offset = gen3SemitoneOffset + gen3FineOffset;
+
+    float frequency1 = midiNoteToFreq(lastNote + gen1Offset);
+    float frequency2 = midiNoteToFreq(lastNote + gen2Offset);
+    float frequency3 = midiNoteToFreq(lastNote + gen3Offset);
+    float frequencyModRange1 = (midiNoteToFreq(lastNote + gen1Offset + 1) - frequency1) * fmSemitoneRange;
+    float frequencyModRange2 = (midiNoteToFreq(lastNote + gen2Offset + 1) - frequency2) * fmSemitoneRange;
+    float frequencyModRange3 = (midiNoteToFreq(lastNote + gen3Offset + 1) - frequency3) * fmSemitoneRange;
+    genElement1->setFrequency(frequency1);
+    genElement2->setFrequency(frequency2);
+    genElement3->setFrequency(frequency3);
+    genElement1->setFMLinearRange(frequencyModRange1);
+    genElement2->setFMLinearRange(frequencyModRange2);
+    genElement3->setFMLinearRange(frequencyModRange3);
+  }
+
 public:
 
   float fmSemitoneRange = 1;
@@ -198,23 +219,8 @@ public:
   }
 
   void onNoteOnEvent(unsigned char note, unsigned char) {
-    float gen1Offset = gen1SemitoneOffset + gen1FineOffset;
-    float gen2Offset = gen2SemitoneOffset + gen2FineOffset;
-    float gen3Offset = gen3SemitoneOffset + gen3FineOffset;
-
-    float frequency1 = midiNoteToFreq(note + gen1Offset);
-    float frequency2 = midiNoteToFreq(note + gen2Offset);
-    float frequency3 = midiNoteToFreq(note + gen3Offset);
-    float frequencyModRange1 = (midiNoteToFreq(note + gen1Offset + 1) - frequency1) * fmSemitoneRange;
-    float frequencyModRange2 = (midiNoteToFreq(note + gen2Offset + 1) - frequency2) * fmSemitoneRange;
-    float frequencyModRange3 = (midiNoteToFreq(note + gen3Offset + 1) - frequency3) * fmSemitoneRange;
-    genElement1->setFrequency(frequency1);
-    genElement2->setFrequency(frequency2);
-    genElement3->setFrequency(frequency3);
-    genElement1->setFMLinearRange(frequencyModRange1);
-    genElement2->setFMLinearRange(frequencyModRange2);
-    genElement3->setFMLinearRange(frequencyModRange3);
-
+    lastNote = note;
+    updateGeneratorFrequencyParams();
     adsrAmpElement->trigger();
     adsrFilterElement->trigger();
   }
@@ -288,21 +294,27 @@ public:
       filterElement->setCutoffFreq(cutoffFreq);
     } else if (paramNumber == PARAM_GEN1_FINE_OFFSET) {
       gen1FineOffset = normMidiEven(paramValue, -1, 1);
+      updateGeneratorFrequencyParams();
       logger << "Set gen 1 fine offset to " << gen1FineOffset << std::endl;
     } else if (paramNumber == PARAM_GEN1_COARSE_OFFSET) {
       gen1SemitoneOffset = static_cast<int>(clamp(paramValue, 0, 48)) - 24;
+      updateGeneratorFrequencyParams();
       logger << "Set gen 1 semitone offset to " << gen1SemitoneOffset << std::endl;
     } else if (paramNumber == PARAM_GEN2_FINE_OFFSET) {
       gen2FineOffset = normMidiEven(paramValue, -1, 1);
+      updateGeneratorFrequencyParams();
       logger << "Set gen 2 fine offset to " << gen2FineOffset << std::endl;
     } else if (paramNumber == PARAM_GEN2_COARSE_OFFSET) {
       gen2SemitoneOffset = static_cast<int>(clamp(paramValue, 0, 48)) - 24;
+      updateGeneratorFrequencyParams();
       logger << "Set gen 2 semitone offset to " << gen2SemitoneOffset << std::endl;
     } else if (paramNumber == PARAM_GEN3_FINE_OFFSET) {
       gen3FineOffset = normMidiEven(paramValue, -1, 1);
+      updateGeneratorFrequencyParams();
       logger << "Set gen 3 fine offset to " << gen3FineOffset << std::endl;
     } else if (paramNumber == PARAM_GEN3_COARSE_OFFSET) {
       gen3SemitoneOffset = static_cast<int>(clamp(paramValue, 0, 48)) - 24;
+      updateGeneratorFrequencyParams();
       logger << "Set gen 3 semitone offset to " << gen3SemitoneOffset << std::endl;
     } else if (paramNumber == PARAM_AMP_ENV_ATTACK) {
       float attack = normMidi(paramValue, envelopeMinAttack, envelopeMaxAttack);
