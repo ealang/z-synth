@@ -78,7 +78,17 @@ static const std::vector<std::function<float(float)>> generatorTable {
   noise_function,
   saw_function,
   sampled_noise(8),
-  reverse_saw_function
+  reverse_saw_function,
+};
+
+static const std::vector<std::string> generatorTableNames {
+  "square",
+  "sine",
+  "triangle",
+  "noise",
+  "saw",
+  "sampled noise 8",
+  "reverse saw",
 };
 
 class NullBuffer : public std::streambuf
@@ -303,20 +313,23 @@ public:
     if (paramNumber == PARAM_GEN1_WAVE_TYPE) {
       // Generator 1 wave type
       if (paramValue < generatorTable.size()) {
-        logger << "Set gen 1 wave " << static_cast<int>(paramValue) << std::endl;
-        genElement1->setValue(generatorTable[paramValue]);
+        int waveNum = static_cast<int>(paramValue);
+        logger << "Set gen 1 wave " << waveNum << " (" << generatorTableNames[waveNum] << ")" << std::endl;
+        genElement1->setValue(generatorTable[waveNum]);
       }
     } else if (paramNumber == PARAM_GEN2_WAVE_TYPE) {
       // Generator 2 wave type
       if (paramValue < generatorTable.size()) {
-        logger << "Set gen 2 wave " << static_cast<int>(paramValue) << std::endl;
-        genElement2->setValue(generatorTable[paramValue]);
+        int waveNum = static_cast<int>(paramValue);
+        logger << "Set gen 2 wave " << waveNum << " (" << generatorTableNames[waveNum] << ")" << std::endl;
+        genElement2->setValue(generatorTable[waveNum]);
       }
     } else if (paramNumber == PARAM_GEN3_WAVE_TYPE) {
       // Generator 2 wave type
       if (paramValue < generatorTable.size()) {
-        logger << "Set gen 3 wave " << static_cast<int>(paramValue) << std::endl;
-        genElement3->setValue(generatorTable[paramValue]);
+        int waveNum = static_cast<int>(paramValue);
+        logger << "Set gen 3 wave " << waveNum << " (" << generatorTableNames[waveNum] << ")" << std::endl;
+        genElement3->setValue(generatorTable[waveNum]);
       }
     } else if (paramNumber == PARAM_GEN1_AMP) {
       const float mix = normMidi(paramValue);
@@ -397,8 +410,9 @@ public:
       lfoElement->setFrequency(value);
     } else if (paramNumber == PARAM_LFO_WAVE_TYPE) {
       if (paramValue < generatorTable.size()) {
-        logger << "Set LFO wave " << static_cast<int>(paramValue) << std::endl;
-        lfoElement->setValue(generatorTable[paramValue]);
+        int waveNum = static_cast<int>(paramValue);
+        logger << "Set LFO wave " << waveNum << " (" << generatorTableNames[waveNum] << ")" << std::endl;
+        lfoElement->setValue(generatorTable[waveNum]);
       }
     } else if (paramNumber == PARAM_LFO_MOD_FREQ_AMT) {
       float value = normMidi(paramValue);
