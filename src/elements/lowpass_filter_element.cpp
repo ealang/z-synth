@@ -3,6 +3,7 @@
 
 #include <cstring>
 #include <cmath>
+#include <stdexcept>
 
 constexpr float M_2PI = M_PI * 2;
 constexpr float filterDebounceHz = 1;

@@ -1,6 +1,7 @@
 #ifndef GENERATOR_FUNCTIONS_H
 #define GENERATOR_FUNCTIONS_H
 
+#include <cstdint>
 #include <functional>
 
 float square_function(float time);

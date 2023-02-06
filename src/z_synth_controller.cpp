@@ -303,7 +303,7 @@ public:
     if (paramNumber == PARAM_GEN1_WAVE_TYPE) {
       // Generator 1 wave type
       if (paramValue < generatorTable.size()) {
-        logger << "Set gen 1 wave " << static_cast<int>(paramValue);
+        logger << "Set gen 1 wave " << static_cast<int>(paramValue) << std::endl;
         genElement1->setValue(generatorTable[paramValue]);
       }
     } else if (paramNumber == PARAM_GEN2_WAVE_TYPE) {
@@ -505,7 +505,6 @@ void ZSynthController::onNRPNValueHighChange(
       masterAmp = paramValue / 127. * maxMasterAmp;
       std::cout << "Set master amp " << masterAmp << std::endl;
       ampElement->setMaxOutputValue(masterAmp * computeOverdriveOutputScale(masterOverdrive));
-
     } else if (paramLow == PARAM_DISTORTION) {
       masterOverdrive = 1 + paramValue / 127. * overdriveMultiplier;
       std::cout << "Set master overdrive param to " << masterOverdrive << std::endl;

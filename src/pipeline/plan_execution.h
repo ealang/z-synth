@@ -6,7 +6,7 @@
 #include <set>
 #include <vector>
 #include <string>
-#include <exception>
+#include <stdexcept>
 
 const uint32_t NULL_BUFFER_NUM = -1;
 

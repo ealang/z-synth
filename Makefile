@@ -10,13 +10,13 @@ TEST_LIBS = $(MAIN_LIBS) -lgtest -lgtest_main
 
 obj/%.o: %.cpp
 	@mkdir -p $(dir $@)
-	g++ -g -O3 -Wall -Wextra -Werror -Wfatal-errors -c -std=c++11 -I src -o $@ $^
+	g++ -g -O3 -Wall -Wextra -Werror -Wfatal-errors -c -std=c++17 -I src -o $@ $^
 
 z-synth: $(MAIN_OBJS)
-	g++ -std=c++11 $^ $(MAIN_LIBS) -o $@
+	g++ -std=c++17 $^ $(MAIN_LIBS) -o $@
 
 z-synth-test: $(TEST_OBJS)
-	g++ -std=c++11 $^ $(TEST_LIBS) -o $@
+	g++ -std=c++17 $^ $(TEST_LIBS) -o $@
 
 .PHONY: all
 all: z-synth z-synth-test
