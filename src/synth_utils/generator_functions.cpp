@@ -34,6 +34,10 @@ float reverse_saw_function(float time) {
   return -saw_function(time);
 }
 
+float zero_function(float) {
+  return 0;
+}
+
 float noise_function(float) {
   return (float)rand() / (RAND_MAX / 2) - 1;
 }

@@ -10,6 +10,7 @@ float triangle_function(float time);
 float noise_function(float);
 float saw_function(float);
 float reverse_saw_function(float);
+float zero_function(float);
 std::function<float(float)> sampled_noise(uint32_t samplesPerPeriod, int seed = 0);
 
 #endif

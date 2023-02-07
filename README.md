@@ -4,7 +4,7 @@ ALSA synth with a WebMIDI UI.
 
 The internals of the synth are easily hackable. The design is standalone audio modules wired together in a DAG, with a central controller to make updates in response to MIDI messages.
 
-[![WebUI](controller-web/screenshot.png)](https://elang.us/z-synth/controller-web/)
+[![WebUI](controller-web/screenshot.png)](https://ealang.github.io/z-synth/controller-web/)
 
 ## Dependencies
 

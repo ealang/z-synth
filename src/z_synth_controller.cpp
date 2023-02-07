@@ -13,6 +13,7 @@
 #include "./pipeline/pipeline_builder.h"
 
 #include <cmath>
+#include <optional>
 
 // Defaults and ranges
 
@@ -37,6 +38,9 @@ static constexpr float defaultMasterAmp = maxMasterAmp * 0.5;
 static constexpr float defaultMasterOverdrive = 1;
 static constexpr float overdriveMultiplier = 64;
 static constexpr float maxGeneratorMixerWeight = 3;
+
+static constexpr float fmSemitoneRange = 1;
+static constexpr float lfoMaxModValue = 1;
 
 // Param numbers
 
@@ -70,6 +74,8 @@ static constexpr uint8_t PARAM_GEN3_AMP           = 0x19;
 static constexpr uint8_t PARAM_LFO_MOD_FREQ_AMT   = 0x1A;
 static constexpr uint8_t PARAM_LFO_MOD_FILT_AMT   = 0x1B;
 static constexpr uint8_t PARAM_LFO_MOD_AMP_AMT    = 0x1C;
+static constexpr uint8_t PARAM_LFO_MOD_PARAM_SEL  = 0x1D;
+static constexpr uint8_t PARAM_LFO_MOD_PARAM_AMT  = 0x1E;
 
 static const std::vector<std::function<float(float)>> generatorTable {
   square_function,
@@ -79,6 +85,7 @@ static const std::vector<std::function<float(float)>> generatorTable {
   saw_function,
   sampled_noise(8),
   reverse_saw_function,
+  zero_function,
 };
 
 static const std::vector<std::string> generatorTableNames {
@@ -89,6 +96,7 @@ static const std::vector<std::string> generatorTableNames {
   "saw",
   "sampled noise 8",
   "reverse saw",
+  "(disabled)",
 };
 
 class NullBuffer : public std::streambuf
@@ -111,6 +119,12 @@ class PerVoiceController {
   std::shared_ptr<ADSRElement> adsrAmpElement;
   std::shared_ptr<ADSRElement> adsrFilterElement;
   std::shared_ptr<LowpassFilterElement> filterElement;
+
+  std::optional<uint32_t> lfoModParamSelect;
+  float lfoModParamValue = 0;
+
+  std::vector<std::string> lfoModParamNames;
+  std::vector<MathMultAddElement*> lfoModParamElems;
 
   unsigned char lastNote = 0;
 
@@ -146,6 +160,29 @@ class PerVoiceController {
     adsrFilterElement->setReleaseTime(0.3);
 
     filterElement = std::make_shared<LowpassFilterElement>(params.sampleRateHz, 620, 101);
+
+    lfoModParamNames = {
+      "am",
+      "filter cutoff",
+      "(disabled)",
+      "(disabled)",
+      "(disabled)",
+      "(disabled)",
+      "(disabled)",
+      "(disabled)",
+    };
+    lfoModParamElems = {
+      lfoSendGenAmElement.get(),
+      lfoSendFilterCutoffElement.get(),
+      nullptr,
+      nullptr,
+      nullptr,
+      nullptr,
+      nullptr,
+      nullptr,
+    };
+
+    updateLfoModParamElement();
   }
 
   void constructWiring(AudioParams params, uint32_t i) {
@@ -251,9 +288,21 @@ class PerVoiceController {
     genElement3->setFMLinearRange(frequencyModRange3);
   }
 
+  void updateLfoModParamElement() {
+    uint32_t selected = (lfoModParamSelect && *lfoModParamSelect < lfoModParamElems.size()) ?
+      *lfoModParamSelect : -1;
+
+    for (uint32_t i = 0; i < lfoModParamElems.size(); ++i) {
+      float val = i == selected ? lfoModParamValue : 0;
+      auto elem = lfoModParamElems[i];
+      if (elem) {
+        elem->setMultValue(val);
+      }
+    }
+  }
+
 public:
 
-  float fmSemitoneRange = 1;
   int gen1SemitoneOffset = 0;
   int gen2SemitoneOffset = 0;
   int gen3SemitoneOffset = 0;
@@ -312,23 +361,23 @@ public:
 
     if (paramNumber == PARAM_GEN1_WAVE_TYPE) {
       // Generator 1 wave type
-      if (paramValue < generatorTable.size()) {
-        int waveNum = static_cast<int>(paramValue);
-        logger << "Set gen 1 wave " << waveNum << " (" << generatorTableNames[waveNum] << ")" << std::endl;
+      uint32_t waveNum = static_cast<uint32_t>(paramValue);
+      if (waveNum < generatorTable.size()) {
+        logger << "Set gen 1 wave " << generatorTableNames[waveNum] << std::endl;
         genElement1->setValue(generatorTable[waveNum]);
       }
     } else if (paramNumber == PARAM_GEN2_WAVE_TYPE) {
       // Generator 2 wave type
-      if (paramValue < generatorTable.size()) {
-        int waveNum = static_cast<int>(paramValue);
-        logger << "Set gen 2 wave " << waveNum << " (" << generatorTableNames[waveNum] << ")" << std::endl;
+      uint32_t waveNum = static_cast<uint32_t>(paramValue);
+      if (waveNum < generatorTable.size()) {
+        logger << "Set gen 2 wave " << generatorTableNames[waveNum] << std::endl;
         genElement2->setValue(generatorTable[waveNum]);
       }
     } else if (paramNumber == PARAM_GEN3_WAVE_TYPE) {
       // Generator 2 wave type
-      if (paramValue < generatorTable.size()) {
-        int waveNum = static_cast<int>(paramValue);
-        logger << "Set gen 3 wave " << waveNum << " (" << generatorTableNames[waveNum] << ")" << std::endl;
+      uint32_t waveNum = static_cast<uint32_t>(paramValue);
+      if (waveNum < generatorTable.size()) {
+        logger << "Set gen 3 wave " << generatorTableNames[waveNum] << std::endl;
         genElement3->setValue(generatorTable[waveNum]);
       }
     } else if (paramNumber == PARAM_GEN1_AMP) {
@@ -409,23 +458,34 @@ public:
       logger << "Set LFO frequency to " << value << std::endl;
       lfoElement->setFrequency(value);
     } else if (paramNumber == PARAM_LFO_WAVE_TYPE) {
-      if (paramValue < generatorTable.size()) {
-        int waveNum = static_cast<int>(paramValue);
-        logger << "Set LFO wave " << waveNum << " (" << generatorTableNames[waveNum] << ")" << std::endl;
+      uint32_t waveNum = static_cast<int>(paramValue);
+      if (waveNum < generatorTable.size()) {
+        logger << "Set LFO wave " << generatorTableNames[waveNum] << std::endl;
         lfoElement->setValue(generatorTable[waveNum]);
       }
     } else if (paramNumber == PARAM_LFO_MOD_FREQ_AMT) {
-      float value = normMidi(paramValue);
+      float value = normMidi(paramValue, 0, lfoMaxModValue);
       logger << "Set LFO mod gen freq amount " << value << std::endl;
       lfoSendGenFMElement->setMultValue(value);
     } else if (paramNumber == PARAM_LFO_MOD_FILT_AMT) {
-      float value = normMidi(paramValue);
+      float value = normMidi(paramValue, 0, lfoMaxModValue);
       logger << "Set LFO mod filter cutoff amount " << value << std::endl;
       lfoSendFilterCutoffElement->setMultValue(value);
     } else if (paramNumber == PARAM_LFO_MOD_AMP_AMT) {
-      float value = normMidi(paramValue);
+      float value = normMidi(paramValue, 0, lfoMaxModValue);
       logger << "Set LFO mod gen amp amount " << value << std::endl;
       lfoSendGenAmElement->setMultValue(value);
+    } else if (paramNumber == PARAM_LFO_MOD_PARAM_SEL) {
+      uint32_t paramNum = static_cast<uint32_t>(paramValue);
+      if (paramNum < lfoModParamNames.size()) {
+        lfoModParamSelect = paramNum;
+        logger << "Set LFO mod param select to " << lfoModParamNames[paramNum] << std::endl;
+        updateLfoModParamElement();
+      }
+    } else if (paramNumber == PARAM_LFO_MOD_PARAM_AMT) {
+      lfoModParamValue = normMidi(paramValue, 0, lfoMaxModValue);
+      logger << "Set LFO mod param value to " << lfoModParamValue << std::endl;
+      updateLfoModParamElement();
     }
   }
 };
